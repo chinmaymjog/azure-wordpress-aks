@@ -1,0 +1,19 @@
+#!/bin/ash
+mysqldump  $db -h $mdbhost -uroot -p$mdbpass > /$db.sql
+
+mysql -h $mdbhost -uroot -p$mdbpass <<MYSQL_SCRIPT
+CREATE DATABASE $new_db;
+GRANT ALL PRIVILEGES ON $new_db.* TO '$user'@'%';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+mysql $new_db -h $mdbhost -uroot -p$mdbpass < /$db.sql
+
+mysql -h $mdbhost -uroot -p$mdbpass <<MYSQL_SCRIPT
+USE $new_db;
+UPDATE wp_options SET option_value = '$new_site' WHERE option_name IN ('siteurl', 'home');
+UPDATE wp_options SET option_value = '$new_site' WHERE option_value LIKE '%indus.example.com%';
+UPDATE wp_posts SET guid = replace(guid, 'http://indus.example.com','$new_site');
+UPDATE wp_posts SET post_content = replace(post_content, 'http://indus.example.com', '$new_site');
+UPDATE wp_postmeta SET meta_value = replace(meta_value, 'http://indus.example.com', '$new_site');
+MYSQL_SCRIPT

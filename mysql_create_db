@@ -1,0 +1,7 @@
+#!/bin/ash
+mysql -h $mdbhost -uroot -p$mdbpass <<MYSQL_SCRIPT
+CREATE DATABASE $db;
+CREATE USER '$user'@'%' IDENTIFIED BY '$pass';
+GRANT ALL PRIVILEGES ON $db.* TO '$user'@'%';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT

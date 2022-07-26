@@ -1,0 +1,3 @@
+#!/bin/ash
+echo "Hi" $user
+echo "This is COOL !! "
