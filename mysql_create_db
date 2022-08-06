@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/bash
 mysql -h $mdbhost -uroot -p$mdbpass <<MYSQL_SCRIPT
 CREATE DATABASE $db;
 CREATE USER '$user'@'%' IDENTIFIED BY '$pass';
