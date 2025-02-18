@@ -1,0 +1,23 @@
+#!/bin/bash
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --host) DB_HOST="$2"; shift 2;;
+        --admin) DB_ADMIN="$2"; shift 2;;
+        --password) DB_PASS="$2"; shift 2;;
+        --dbname) DB_NAME="$2"; shift 2;;
+        --help) echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name>"; exit 0;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+if [[ -z "$DB_HOST" || -z "$DB_ADMIN" || -z "$DB_PASS" || -z "$DB_NAME" ]]; then
+    echo "Error: Missing parameters."
+    echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name>"
+    exit 1
+fi
+
+mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-ssl -e "
+CREATE DATABASE IF NOT EXISTS $DB_NAME;
+FLUSH PRIVILEGES;
+"
