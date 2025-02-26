@@ -1,0 +1,47 @@
+#!/bin/bash
+
+usage () {
+    echo "usage: $0 --srcstaccount <src_st_account> --srcstkey <src_st_key> --srcstcontainer <src_st_container> --dststaccount <dst_st_account> --dststkey <dst_st_key> --dststcontainer <dst_st_container> [--tmpdir <temp_directory>]"
+    exit 1
+}
+
+TMPDIR="/tmp/azure_transfer"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
+        --srcstkey) SRC_ST_KEY="$2"; shift 2;;
+        --srcstcontainer) SRC_ST_CONTAINER="$2"; shift 2;;
+        --dststaccount) DST_ST_ACCOUNT="$2"; shift 2;;
+        --dststkey) DST_ST_KEY="$2"; shift 2;;
+        --dststcontainer) DST_ST_CONTAINER="$2"; shift 2;;
+        --tmpdir) TMPDIR="$2"; shift 2;;
+        --help) usage;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+if [[ -z "$SRC_ST_ACCOUNT" || -z "$SRC_ST_KEY" || -z "$SRC_ST_CONTAINER" || -z "$DST_ST_ACCOUNT" || -z "$DST_ST_KEY" || -z "$DST_ST_CONTAINER" ]]; then
+    echo "Error: Missing parameters."
+    usage
+    exit 1
+fi
+
+mkdir -p "$TMPDIR"
+
+echo "Downloading files from source storage..."
+if ! az storage file download-batch --account-name "$SRC_ST_ACCOUNT" --account-key "$SRC_ST_KEY" --destination "$TMPDIR" --source "$SRC_ST_CONTAINER" --pattern "*"; then
+    echo "Error: Failed to download files."
+    exit 1
+fi
+
+echo "Uploading files to destination storage..."
+if ! az storage file upload-batch --account-name "$DST_ST_ACCOUNT" --account-key "$DST_ST_KEY" --source "$TMPDIR" --destination "$DST_ST_CONTAINER" --pattern "*"; then
+    echo "Error: Failed to upload files."
+    exit 1
+fi
+
+echo "Cleaning up temporary files..."
+rm -rf "$TMPDIR"
+
+echo "File transfer completed successfully."

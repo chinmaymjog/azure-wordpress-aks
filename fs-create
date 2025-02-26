@@ -1,0 +1,52 @@
+#!/bin/bash
+
+usage () {
+    echo "Usage: $0 --staccount <st_account> --stkey <st_key> --stfileshare <st_fileshare> --dir <dir> --file <file>"
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --staccount) ST_ACCOUNT="$2"; shift 2;;
+        --stkey) ST_KEY="$2"; shift 2;;
+        --stfileshare) ST_FILESHARE="$2"; shift 2;;
+        --dir) DIR="$2"; shift 2;;
+        --file) FILE="$2"; shift 2;;
+        --help) usage;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
+if [[ -z "$ST_ACCOUNT" || -z "$ST_KEY" || -z "$ST_FILESHARE" || -z "$DIR" || -z "$FILE" ]]; then
+    echo "Error: Missing parameters."
+    usage
+    exit 1
+fi
+
+RESULT=$(az storage share exists --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --name "$ST_FILESHARE" -o tsv)
+echo $RESULT
+if [ "$RESULT" == "True" ]; then
+    echo "===> Fileshare $ST_FILESHARE exists."
+else
+    echo "===> Creating Fileshare $ST_FILESHARE."
+    az storage share create --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --name "$ST_FILESHARE" 
+    echo "===> Fileshare $ST_FILESHARE created."
+fi
+
+RESULT=$(az storage directory exists --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --share-name "$ST_FILESHARE" --name "$DIR" -o tsv)
+if [ "$RESULT" == "True" ]; then
+    echo "===> Directory $DIR exists."
+    else
+    echo "===> Creating Directory $DIR."
+    az storage directory create --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --share-name "$ST_FILESHARE" --name "$DIR"
+    echo "===> Directory $DIR created."
+fi  
+
+RESULT=$(az storage file exists --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --share-name "$ST_FILESHARE" --path "$DIR/$FILE" -o tsv)
+if [ "$RESULT" == "True" ]; then
+    echo "===> File $FILE exists."
+else
+    echo "===> Uploading File $FILE."
+    az storage file upload --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --share-name "$ST_FILESHARE" --source "$FILE" --path "$DIR/.$FILE"
+    echo "===> File $FILE uploaded."
+fi

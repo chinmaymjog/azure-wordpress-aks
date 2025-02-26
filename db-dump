@@ -1,5 +1,10 @@
 #!/bin/bash
 
+usage () {
+    echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name> --staccount <st_account> --stkey <st_key> --stcontainer <st_container>"
+    exit 1
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --host) DB_HOST="$2"; shift 2;;
@@ -9,26 +14,31 @@ while [[ $# -gt 0 ]]; do
         --staccount) ST_ACCOUNT="$2"; shift 2;;
         --stkey) ST_KEY="$2"; shift 2;;
         --stcontainer) ST_CONTAINER="$2"; shift 2;;
-        --help) echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name> --staccount <st_account> --stkey <st_key> --stcontainer <st_container>"; exit 0;;
+        --help) usage;;
         *) echo "Unknown option: $1"; exit 1;;
     esac
 done
 
 if [[ -z "$DB_HOST" || -z "$DB_ADMIN" || -z "$DB_PASS" || -z "$DB_NAME" || -z "$ST_ACCOUNT" || -z "$ST_KEY" || -z "$ST_CONTAINER" ]]; then
     echo "Error: Missing parameters."
-    echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name> --staccount <st_account> --stkey <st_key> --stcontainer <st_container>"
+    usage
     exit 1
 fi
 
-dt=$(date +%d%m%y%H%M%S)
-mysqldump "$DB_NAME" -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" > "/$DB_NAME-$dt.sql"
-if [[ $? -ne 0 ]]; then
-    echo "Error: mysqldump failed."
-    exit 1
-fi
-
-az storage blob upload --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --container-name "$ST_CONTAINER" --file "/$DB_NAME-$dt.sql" --name "$DB_NAME-$dt.sql"
-if [[ $? -ne 0 ]]; then
-    echo "Error: Azure blob upload failed."
-    exit 1
+echo "===> Creating database dump for $DB_NAME ..."
+export MYSQL_PWD=$DB_PASS
+RESULT=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME'")
+echo $RESULT
+if [ "$RESULT" == "$DB_NAME" ]; then
+    dt=$(date +%d%m%y%H%M%S)
+    mysqldump -h "$DB_HOST" -u"$DB_ADMIN" "$DB_NAME" > "$DB_NAME-$dt.sql"
+    tar -czvf "$DB_NAME-$dt.sql.tar.gz" "$DB_NAME-$dt.sql"
+    rm "$DB_NAME-$dt.sql"
+    echo "===> Database $DB_NAME dump created."
+    echo "$DB_NAME-$dt.sql" > checkin.txt
+    az storage blob upload --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --container-name "$ST_CONTAINER" --file "$DB_NAME-$dt.sql.tar.gz" --name "$DB_NAME-$dt.sql.tar.gz"
+    az storage blob upload --account-name "$ST_ACCOUNT" --account-key "$ST_KEY" --container-name "$ST_CONTAINER" --file "checkin.txt" --name "checkin.txt" --overwrite
+    echo "===> Database $DB_NAME uploaded successfully."
+else
+    echo "===> Database does not exists. Skipping creation."
 fi
