@@ -64,6 +64,6 @@ if az storage file exists --share-name "$ST_FILESHARE" --path "$DIR/$FILE" -o ts
     echo "===> File '$FILE' already exists."
 else
     echo "===> Uploading File '$FILE'..."
-    az storage file upload --share-name "$ST_FILESHARE" --source "$FILE" --path "$DIR/$FILE" || die "Failed to upload File '$FILE'."
+    az storage file upload --share-name "$ST_FILESHARE" --source "$FILE" --path "$DIR/.$FILE" || die "Failed to upload File '$FILE'."
     echo "===> File '$FILE' uploaded."
 fi

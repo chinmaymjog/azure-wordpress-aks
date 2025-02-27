@@ -54,21 +54,21 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     if [[ ! -f checkin.txt ]]; then
         die "checkin.txt file not found after download!"
     fi
-    SOURCE_DB=$(cat checkin.txt)
+    BACKUP_FILE=$(cat checkin.txt)
 
-    echo "===> Downloading database dump '$SOURCE_DB.tar.gz'..."
-    az storage blob download --container-name "$ST_CONTAINER" --name "$SOURCE_DB.tar.gz" --file "$SOURCE_DB.tar.gz" || die "Failed to download database dump."
+    echo "===> Downloading database dump '$BACKUP_FILE.tar.gz'..."
+    az storage blob download --container-name "$ST_CONTAINER" --name "$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
 
     echo "===> Extracting database dump..."
-    tar -xzvf "$SOURCE_DB.tar.gz" || die "Failed to extract database dump."
+    tar -xzvf "$BACKUP_FILE.tar.gz" || die "Failed to extract database dump."
 
     # Ensure extracted SQL file exists
-    if [[ ! -f "$SOURCE_DB.sql" ]]; then
-        die "Extracted SQL file '$SOURCE_DB.sql' not found!"
+    if [[ ! -f "$BACKUP_FILE" ]]; then
+        die "Extracted SQL file '$BACKUP_FILE' not found!"
     fi
 
-    echo "===> Restoring database from '$SOURCE_DB.sql'..."
-    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" "$DB_NAME" < "$SOURCE_DB.sql" || die "Database restore failed."
+    echo "===> Restoring database from '$BACKUP_FILE'..."
+    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" "$DB_NAME" < "$BACKUP_FILE" || die "Database restore failed."
 
     echo "===> Database '$DB_NAME' restore completed successfully."
 else
