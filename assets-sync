@@ -1,12 +1,25 @@
 #!/bin/bash
 
-usage () {
-    echo "usage: $0 --srcstaccount <src_st_account> --srcstkey <src_st_key> --srcstcontainer <src_st_container> --dststaccount <dst_st_account> --dststkey <dst_st_key> --dststcontainer <dst_st_container> [--tmpdir <temp_directory>]"
+set -e  # Exit immediately if a command exits with a non-zero status
+set -u  # Treat unset variables as an error
+set -o pipefail  # Catch errors in pipelines
+
+# Function for error handling
+die () {
+    echo "Error: $1" >&2
     exit 1
 }
 
-TMPDIR="/tmp/azure_transfer"
+# Function for script usage
+usage () {
+    echo "Usage: $0 --srcstaccount <src_st_account> --srcstkey <src_st_key> --srcstcontainer <src_st_container> --dststaccount <dst_st_account> --dststkey <dst_st_key> --dststcontainer <dst_st_container> [--tmpdir <temp_directory>]"
+    exit 1
+}
 
+# Use a secure temporary directory
+TMPDIR=$(mktemp -d) || die "Failed to create a temporary directory."
+
+# Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
@@ -17,31 +30,40 @@ while [[ $# -gt 0 ]]; do
         --dststcontainer) DST_ST_CONTAINER="$2"; shift 2;;
         --tmpdir) TMPDIR="$2"; shift 2;;
         --help) usage;;
-        *) echo "Unknown option: $1"; exit 1;;
+        *) die "Unknown option: $1";;
     esac
 done
 
-if [[ -z "$SRC_ST_ACCOUNT" || -z "$SRC_ST_KEY" || -z "$SRC_ST_CONTAINER" || -z "$DST_ST_ACCOUNT" || -z "$DST_ST_KEY" || -z "$DST_ST_CONTAINER" ]]; then
-    echo "Error: Missing parameters."
-    usage
-    exit 1
+# Validate required parameters
+if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_CONTAINER:-}" || -z "${DST_ST_ACCOUNT:-}" || -z "${DST_ST_KEY:-}" || -z "${DST_ST_CONTAINER:-}" ]]; then
+    die "Missing required parameters."
 fi
 
-mkdir -p "$TMPDIR"
+# Set Azure storage environment variables (avoid exposing credentials in CLI)
+export AZURE_STORAGE_ACCOUNT="$SRC_ST_ACCOUNT"
+export AZURE_STORAGE_KEY="$SRC_ST_KEY"
 
-echo "Downloading files from source storage..."
-if ! az storage file download-batch --account-name "$SRC_ST_ACCOUNT" --account-key "$SRC_ST_KEY" --destination "$TMPDIR" --source "$SRC_ST_CONTAINER" --pattern "*"; then
-    echo "Error: Failed to download files."
-    exit 1
+echo "===> Checking if source storage container exists..."
+if ! az storage container exists --name "$SRC_ST_CONTAINER" --account-name "$SRC_ST_ACCOUNT" --account-key "$SRC_ST_KEY" --query "exists" --output tsv | grep -q "true"; then
+    die "Source container '$SRC_ST_CONTAINER' does not exist."
 fi
 
-echo "Uploading files to destination storage..."
-if ! az storage file upload-batch --account-name "$DST_ST_ACCOUNT" --account-key "$DST_ST_KEY" --source "$TMPDIR" --destination "$DST_ST_CONTAINER" --pattern "*"; then
-    echo "Error: Failed to upload files."
-    exit 1
+echo "===> Downloading files from source storage..."
+if ! azcopy copy "https://$SRC_ST_ACCOUNT.blob.core.windows.net/$SRC_ST_CONTAINER/*" "$TMPDIR/" --recursive; then
+    die "Failed to download files from source container."
 fi
 
-echo "Cleaning up temporary files..."
+# Set destination storage credentials
+export AZURE_STORAGE_ACCOUNT="$DST_ST_ACCOUNT"
+export AZURE_STORAGE_KEY="$DST_ST_KEY"
+
+echo "===> Uploading files to destination storage..."
+if ! azcopy copy "$TMPDIR/*" "https://$DST_ST_ACCOUNT.blob.core.windows.net/$DST_ST_CONTAINER/" --recursive; then
+    die "Failed to upload files to destination container."
+fi
+
+# Cleanup temporary files
+echo "===> Cleaning up temporary files..."
 rm -rf "$TMPDIR"
 
-echo "File transfer completed successfully."
+echo "===> File transfer completed successfully."
