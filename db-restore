@@ -12,7 +12,7 @@ die () {
 
 # Function for script usage
 usage () {
-    echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --dbname <db_name> --staccount <st_account> --stkey <st_key> --stcontainer <st_container>"
+    echo "Usage: $0 --host <host> --admin <admin> --password <admin_pass> --scrdbname <src_db_name> --srcstaccount <src_st_account> --srcstkey <src_st_key> --srcstcontainer <src_st_container> --dstdbname <dst_db_name> --dststaccount <dst_st_account> --dststkey <dst_st_key> --dststcontainer <dst_st_container>"
     exit 1
 }
 
@@ -22,17 +22,21 @@ while [[ $# -gt 0 ]]; do
         --host) DB_HOST="$2"; shift 2;;
         --admin) DB_ADMIN="$2"; shift 2;;
         --password) DB_PASS="$2"; shift 2;;
-        --dbname) DB_NAME="$2"; shift 2;;
-        --staccount) ST_ACCOUNT="$2"; shift 2;;
-        --stkey) ST_KEY="$2"; shift 2;;
-        --stcontainer) ST_FILESYSTEM="$2"; shift 2;;
+        --srcdbname) SRC_DB_NAME="$2"; shift 2;;
+        --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
+        --srcstkey) SRC_ST_KEY="$2"; shift 2;;
+        --srcstcontainer) SRC_ST_FILESYSTEM="$2"; shift 2;;
+        --dstdbname) DST_DB_NAME="$2"; shift 2;;
+        --dststaccount) DST_ST_ACCOUNT="$2"; shift 2;;
+        --dststkey) DST_ST_KEY="$2"; shift 2;;
+        --dststcontainer) DST_ST_FILESYSTEM="$2"; shift 2;;
         --help) usage;;
         *) die "Unknown option: $1";;
     esac
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_FILESYSTEM:-}" ]]; then
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${$SCR_DB_NAME}" ||  -z "${$SRC_ST_ACCOUNT}"  || -z "${$SRC_ST_KEY}" || -z "${$SRC_ST_FILESYSTEM}" || -z "${$DST_DB_NAME}" || -z "${$DST_ST_ACCOUNT}" || -z "${$DST_ST_KEY}" || -z "${$DST_ST_FILESYSTEM}" ]]; then  
     die "Missing required parameters."
 fi
 
@@ -41,22 +45,25 @@ export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$ST_KEY"
 
 # Check if Container exists
-echo "===> Checking if Container '$ST_FILESYSTEM' exists..."
-if az storage container exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
-    echo "===> Container '$ST_FILESYSTEM' exists."
+echo "===> Checking if Container '$SRC_ST_FILESYSTEM' exists..."
+if az storage container exists --name "$SRC_ST_FILESYSTEM" -o tsv | grep -q "True"; then
+    echo "===> Container '$SRC_ST_FILESYSTEM' exists."
 else
     die "Container '$ST_FILESYSTEM' does not exists."
 fi
 
-echo "===> Checking if database '$DB_NAME' exists on host '$DB_HOST'..."
-DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME'") || die "Failed to connect to MySQL."
+echo "===> Checking if database '$DST_DB_NAME' exists on host '$DB_HOST'..."
+DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DST_DB_NAME'") || die "Failed to connect to MySQL."
 
-if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
-    echo "===> Database '$DB_NAME' exists. Proceeding with restore..."
+if [[ "$DB_EXISTS" == "$DST_DB_NAME" ]]; then
+    echo "===> Database '$DST_DB_NAME' exists. Proceeding with restore..."
+    
+    #Backup the database
+    db-dump --host "$DB_HOST" --admin "$DB_ADMIN" --password "$DB_PASS" --dbname "$DST_DB_NAME" --staccount "$DST_ST_ACCOUNT" --stkey "$DST_ST_KEY" --stcontainer "$DST_ST_FILESYSTEM" || die "Failed to backup database."
 
     # Download checkin.txt
     echo "===> Downloading 'checkin.txt' from Azure Storage..."
-    az storage blob download --container-name "$ST_FILESYSTEM" --name "checkin.txt" --file "checkin.txt" --overwrite || die "Failed to download checkin.txt."
+    az storage blob download --container-name "$SRC_ST_FILESYSTEM" --name "checkin.txt" --file "checkin.txt" --overwrite || die "Failed to download checkin.txt."
 
     # Read the database dump name
     if [[ ! -f checkin.txt ]]; then
@@ -65,7 +72,7 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     BACKUP_FILE=$(cat checkin.txt)
 
     echo "===> Downloading database dump '$BACKUP_FILE.tar.gz'..."
-    az storage blob download --container-name "$ST_FILESYSTEM" --name "$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
+    az storage blob download --container-name "$SRC_ST_FILESYSTEM" --name "$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
 
     echo "===> Extracting database dump..."
     tar -xzvf "$BACKUP_FILE.tar.gz" || die "Failed to extract database dump."
@@ -76,9 +83,9 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     fi
 
     echo "===> Restoring database from '$BACKUP_FILE'..."
-    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" "$DB_NAME" < "$BACKUP_FILE" || die "Database restore failed."
+    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" "$DST_DB_NAME" < "$BACKUP_FILE" || die "Database restore failed."
 
-    echo "===> Database '$DB_NAME' restore completed successfully."
+    echo "===> Database '$DST_DB_NAME' restore completed successfully."
 else
-    echo "===> Database '$DB_NAME' does not exist. Skipping restore."
+    echo "===> Database '$DST_DB_NAME' does not exist. Skipping restore."
 fi
