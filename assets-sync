@@ -24,10 +24,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
         --srcstkey) SRC_ST_KEY="$2"; shift 2;;
-        --srcstcontainer) SRC_ST_CONTAINER="$2"; shift 2;;
+        --srcstcontainer) SRC_ST_FILESYSTEM="$2"; shift 2;;
         --dststaccount) DST_ST_ACCOUNT="$2"; shift 2;;
         --dststkey) DST_ST_KEY="$2"; shift 2;;
-        --dststcontainer) DST_ST_CONTAINER="$2"; shift 2;;
+        --dststcontainer) DST_ST_FILESYSTEM="$2"; shift 2;;
         --tmpdir) TMPDIR="$2"; shift 2;;
         --help) usage;;
         *) die "Unknown option: $1";;
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_CONTAINER:-}" || -z "${DST_ST_ACCOUNT:-}" || -z "${DST_ST_KEY:-}" || -z "${DST_ST_CONTAINER:-}" ]]; then
+if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_FILESYSTEM:-}" || -z "${DST_ST_ACCOUNT:-}" || -z "${DST_ST_KEY:-}" || -z "${DST_ST_FILESYSTEM:-}" ]]; then
     die "Missing required parameters."
 fi
 
@@ -44,12 +44,12 @@ export AZURE_STORAGE_ACCOUNT="$SRC_ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$SRC_ST_KEY"
 
 echo "===> Checking if source storage container exists..."
-if ! az storage container exists --name "$SRC_ST_CONTAINER" --account-name "$SRC_ST_ACCOUNT" --account-key "$SRC_ST_KEY" --query "exists" --output tsv | grep -q "true"; then
-    die "Source container '$SRC_ST_CONTAINER' does not exist."
+if ! az storage container exists --name "$SRC_ST_FILESYSTEM" --account-name "$SRC_ST_ACCOUNT" --account-key "$SRC_ST_KEY" --query "exists" --output tsv | grep -q "true"; then
+    die "Source container '$SRC_ST_FILESYSTEM' does not exist."
 fi
 
 echo "===> Downloading files from source storage..."
-if ! azcopy copy "https://$SRC_ST_ACCOUNT.blob.core.windows.net/$SRC_ST_CONTAINER/*" "$TMPDIR/" --recursive; then
+if ! azcopy copy "https://$SRC_ST_ACCOUNT.blob.core.windows.net/$SRC_ST_FILESYSTEM/*" "$TMPDIR/" --recursive; then
     die "Failed to download files from source container."
 fi
 
@@ -58,7 +58,7 @@ export AZURE_STORAGE_ACCOUNT="$DST_ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$DST_ST_KEY"
 
 echo "===> Uploading files to destination storage..."
-if ! azcopy copy "$TMPDIR/*" "https://$DST_ST_ACCOUNT.blob.core.windows.net/$DST_ST_CONTAINER/" --recursive; then
+if ! azcopy copy "$TMPDIR/*" "https://$DST_ST_ACCOUNT.blob.core.windows.net/$DST_ST_FILESYSTEM/" --recursive; then
     die "Failed to upload files to destination container."
 fi
 

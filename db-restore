@@ -25,20 +25,28 @@ while [[ $# -gt 0 ]]; do
         --dbname) DB_NAME="$2"; shift 2;;
         --staccount) ST_ACCOUNT="$2"; shift 2;;
         --stkey) ST_KEY="$2"; shift 2;;
-        --stcontainer) ST_CONTAINER="$2"; shift 2;;
+        --stcontainer) ST_FILESYSTEM="$2"; shift 2;;
         --help) usage;;
         *) die "Unknown option: $1";;
     esac
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_CONTAINER:-}" ]]; then
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_FILESYSTEM:-}" ]]; then
     die "Missing required parameters."
 fi
 
 # Set Azure storage environment variables
 export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$ST_KEY"
+
+# Check if Container exists
+echo "===> Checking if Container '$ST_FILESYSTEM' exists..."
+if az storage container exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
+    echo "===> Container '$ST_FILESYSTEM' exists."
+else
+    die "Container '$ST_FILESYSTEM' does not exists."
+fi
 
 echo "===> Checking if database '$DB_NAME' exists on host '$DB_HOST'..."
 DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME'") || die "Failed to connect to MySQL."
@@ -48,7 +56,7 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
 
     # Download checkin.txt
     echo "===> Downloading 'checkin.txt' from Azure Storage..."
-    az storage blob download --container-name "$ST_CONTAINER" --name "checkin.txt" --file "checkin.txt" --overwrite || die "Failed to download checkin.txt."
+    az storage blob download --container-name "$ST_FILESYSTEM" --name "checkin.txt" --file "checkin.txt" --overwrite || die "Failed to download checkin.txt."
 
     # Read the database dump name
     if [[ ! -f checkin.txt ]]; then
@@ -57,7 +65,7 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     BACKUP_FILE=$(cat checkin.txt)
 
     echo "===> Downloading database dump '$BACKUP_FILE.tar.gz'..."
-    az storage blob download --container-name "$ST_CONTAINER" --name "$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
+    az storage blob download --container-name "$ST_FILESYSTEM" --name "$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
 
     echo "===> Extracting database dump..."
     tar -xzvf "$BACKUP_FILE.tar.gz" || die "Failed to extract database dump."

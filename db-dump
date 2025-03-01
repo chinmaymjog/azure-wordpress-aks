@@ -25,20 +25,30 @@ while [[ $# -gt 0 ]]; do
         --dbname) DB_NAME="$2"; shift 2;;
         --staccount) ST_ACCOUNT="$2"; shift 2;;
         --stkey) ST_KEY="$2"; shift 2;;
-        --stcontainer) ST_CONTAINER="$2"; shift 2;;
+        --stcontainer) ST_FILESYSTEM="$2"; shift 2;;
         --help) usage;;
         *) die "Unknown option: $1";;
     esac
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_CONTAINER:-}" ]]; then
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_FILESYSTEM:-}" ]]; then
     die "Missing required parameters."
 fi
 
 # Set Azure storage environment variables
 export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$ST_KEY"
+
+# Check if Container exists
+echo "===> Checking if Container '$ST_FILESYSTEM' exists..."
+if az storage container exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
+    echo "===> Container '$ST_FILESYSTEM' exists."
+else
+    echo "===> Creating Fileshare '$ST_FILESYSTEM'..."
+    az storage container create --name "$ST_FILESYSTEM" || die "Failed to create Container '$ST_FILESYSTEM'."
+    echo "===> Container '$ST_FILESYSTEM' created."
+fi
 
 echo "===> Checking if database '$DB_NAME' exists on host '$DB_HOST'..."
 DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME'") || die "Failed to connect to MySQL."
@@ -61,14 +71,14 @@ if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     echo "$BACKUP_FILE" > checkin.txt
 
     echo "===> Uploading database backup to Azure Blob Storage..."
-    az storage blob upload --container-name "$ST_CONTAINER" --file "$BACKUP_FILE.tar.gz" --name "$BACKUP_FILE.tar.gz" --overwrite || die "Backup upload failed."
+    az storage blob upload --container-name "$ST_FILESYSTEM" --file "$BACKUP_FILE.tar.gz" --name "$BACKUP_FILE.tar.gz" --overwrite || die "Backup upload failed."
 
-    az storage blob upload --container-name "$ST_CONTAINER" --file "checkin.txt" --name "checkin.txt" --overwrite || die "Checkin file upload failed."
+    az storage blob upload --container-name "$ST_FILESYSTEM" --file "checkin.txt" --name "checkin.txt" --overwrite || die "Checkin file upload failed."
 
     echo "===> Database backup '$BACKUP_FILE' uploaded successfully."
 
-    # Cleanup
-    # rm -f "$BACKUP_FILE" checkin.txt
+    Cleanup
+    rm -f "$BACKUP_FILE" checkin.txt
 else
     echo "===> Database '$DB_NAME' does not exist. Skipping backup."
 fi
