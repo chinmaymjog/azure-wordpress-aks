@@ -31,14 +31,14 @@ if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_N
     die "Missing parameters."
 fi
 
-echo "===> Connecting to $DB_HOST to check database existence..."
+echo "===> Connecting to $DB_HOST to check database existence."
 
 DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME';") || die "Failed to check database existence."
 
 if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     echo "===> Database '$DB_NAME' already exists. Skipping creation."
 else
-    echo "===> Creating database '$DB_NAME'..."
+    echo "===> Database does not exists so creating database '$DB_NAME'."
     mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" -e "
     CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
     FLUSH PRIVILEGES;

@@ -12,7 +12,7 @@ die () {
 
 # Usage function
 usage () {
-    echo "Usage: $0 --staccount <st_account> --stkey <st_key> --stfilesystem <st_fileshare> --dir <dir> --file <file>"
+    echo "Usage: $0 --staccount <st_account> --stkey <st_key> --stfilesystem <st_filesystem> --dir <dir> --file <file>"
     exit 1
 }
 
@@ -39,11 +39,11 @@ export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$ST_KEY"
 
 # Check if Fileshare exists
-echo "===> Checking if Fileshare '$ST_FILESYSTEM' exists..."
+echo "===> Checking if Fileshare '$ST_FILESYSTEM' exists."
 if az storage share exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
     echo "===> Fileshare '$ST_FILESYSTEM' exists."
 else
-    echo "===> Creating Fileshare '$ST_FILESYSTEM'..."
+    echo "===> Fileshare does not exists so creating Fileshare '$ST_FILESYSTEM'."
     az storage share create --name "$ST_FILESYSTEM" || die "Failed to create Fileshare '$ST_FILESYSTEM'."
     echo "===> Fileshare '$ST_FILESYSTEM' created."
 fi
@@ -53,27 +53,17 @@ echo "===> Checking if Directory '$DIR' exists..."
 if az storage directory exists --share-name "$ST_FILESYSTEM" --name "$DIR" -o tsv | grep -q "True"; then
     echo "===> Directory '$DIR' exists."
 else
-    echo "===> Creating Directory '$DIR'..."
+    echo "===> Directory does not exists so creating Directory '$DIR'."
     az storage directory create --share-name "$ST_FILESYSTEM" --name "$DIR" || die "Failed to create Directory '$DIR'."
     echo "===> Directory '$DIR' created."
 fi  
-
-# Check if File exists
-# echo "===> Checking if File '$FILE' exists..."
-# if az storage file exists --share-name "$ST_FILESYSTEM" --path "$DIR/$FILE" -o tsv | grep -q "True"; then
-#     echo "===> File '$FILE' already exists."
-# else
-#     echo "===> Uploading File '$FILE'..."
-#     az storage file upload --share-name "$ST_FILESYSTEM" --source "$FILE" --path "$DIR/$FILE" || die "Failed to upload File '$FILE'."
-#     echo "===> File '$FILE' uploaded."
-# fi
 
 # Check if Container exists
 echo "===> Checking if Container '$ST_FILESYSTEM' exists..."
 if az storage container exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
     echo "===> Container '$ST_FILESYSTEM' exists."
 else
-    echo "===> Creating Fileshare '$ST_FILESYSTEM'..."
+    echo "===> Container does not exists so creating container '$ST_FILESYSTEM'."
     az storage container create --name "$ST_FILESYSTEM" || die "Failed to create Container '$ST_FILESYSTEM'."
     echo "===> Container '$ST_FILESYSTEM' created."
 fi
@@ -83,7 +73,7 @@ echo "===> Checking if Directory '$DIR' exists..."
 if az storage fs directory exists --file-system "$ST_FILESYSTEM" --name "$DIR" -o tsv | grep -q "True"; then
     echo "===> Directory '$DIR' exists."
 else
-    echo "===> Creating Directory '$DIR'..."
+    echo "===> Directory does not exists so creating Directory '$DIR' on ."
     az storage fs directory create --file-system "$ST_FILESYSTEM" --name "$DIR" || die "Failed to create Directory '$DIR'."
     echo "===> Directory '$DIR' created."
 fi  

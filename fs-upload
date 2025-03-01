@@ -12,7 +12,7 @@ die () {
 
 # Usage function
 usage () {
-    echo "Usage: $0 --staccount <st_account> --stkey <st_key> --stfilesystem <st_fileshare> --dir <dir> --file <file>"
+    echo "Usage: $0 --staccount <st_account> --stkey <st_key> --stfilesystem <st_filesystem> --dir <dir> --file <file>"
     exit 1
 }
 
@@ -39,27 +39,27 @@ export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$ST_KEY"
 
 # Check if Fileshare exists
-echo "===> Checking if Fileshare '$ST_FILESYSTEM' exists..."
+echo "===> Checking if Fileshare '$ST_FILESYSTEM' exists."
 if az storage share exists --name "$ST_FILESYSTEM" -o tsv | grep -q "True"; then
     echo "===> Fileshare '$ST_FILESYSTEM' exists."
 else
-    die "Fileshare '$ST_FILESYSTEM' does not exists.."
+    die "Fileshare '$ST_FILESYSTEM' does not exists."
 fi
 
 # Check if Directory exists
-echo "===> Checking if Directory '$DIR' exists..."
+echo "===> Checking if Directory '$DIR' exists on Fileshare '$ST_FILESYSTEM'"
 if az storage directory exists --share-name "$ST_FILESYSTEM" --name "$DIR" -o tsv | grep -q "True"; then
     echo "===> Directory '$DIR' exists."
 else
-    die "Directory '$DIR' does not exists.."
+    die "Directory '$DIR' does not exists."
 fi  
 
 # Check if File exists
-echo "===> Checking if File '$FILE' exists..."
+echo "===> Checking if File '$FILE' exists."
 if az storage file exists --share-name "$ST_FILESYSTEM" --path "$DIR/$FILE" -o tsv | grep -q "True"; then
     echo "===> File '$FILE' already exists."
 else
-    echo "===> Uploading File '$FILE'..."
+    echo "===> File does not exists so uploading File '$FILE'."
     az storage file upload --share-name "$ST_FILESYSTEM" --source "$FILE" --path "$DIR/$FILE" || die "Failed to upload File '$FILE'."
     echo "===> File '$FILE' uploaded."
 fi
