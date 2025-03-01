@@ -54,7 +54,7 @@ else
     die "Directory '$DIR' does not exists.."
 fi  
 
-Check if File exists
+# Check if File exists
 echo "===> Checking if File '$FILE' exists..."
 if az storage file exists --share-name "$ST_FILESYSTEM" --path "$DIR/$FILE" -o tsv | grep -q "True"; then
     echo "===> File '$FILE' already exists."
