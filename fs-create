@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_FILESYSTEM:-}" || -z "${DIR:-}" || -z "${FILE:-}" ]]; then
+if [[ -z "${ST_ACCOUNT:-}" || -z "${ST_KEY:-}" || -z "${ST_FILESYSTEM:-}" || -z "${DIR:-}" ]]; then
     die "Missing parameters."
 fi
 
