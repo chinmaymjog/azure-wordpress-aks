@@ -43,7 +43,7 @@ export AZURE_STORAGE_KEY="$SRC_ST_KEY"
 
 # Check if Directory exists
 echo "===> Checking if Directory '$DIR' exists..."
-if az storage fs directory exists --file-system "$ST_CONTAINER" --name "$DIR" -o tsv | grep -q "True"; then
+if az storage fs directory exists --file-system "$SRC_ST_CONTAINER" --name "$DIR" -o tsv | grep -q "True"; then
     echo "===> Directory '$DIR' exists."
 else
     die "Directory '$DIR' does not exists."
