@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
         --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
         --srcstkey) SRC_ST_KEY="$2"; shift 2;;
         --srcstfileshare) SRC_ST_FILESHARE="$2"; shift 2;;
-        --srcpath) SRC_DIR="$2"; shift2;;
+        --srcpath) SRC_DIR="$2"; shift 2;;
         --dststaccount) DST_ST_ACCOUNT="$2"; shift 2;;
         --dststkey) DST_ST_KEY="$2"; shift 2;;
         --dststfileshare) DST_ST_FILESHARE="$2"; shift 2;;
