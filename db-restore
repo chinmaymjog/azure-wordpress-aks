@@ -23,7 +23,6 @@ while [[ $# -gt 0 ]]; do
         --admin) DB_ADMIN="$2"; shift 2;;
         --password) DB_PASS="$2"; shift 2;;
         --dbname) DB_NAME="$2"; shift 2;;
-        --srcdbname) SRC_DB_NAME="$2"; shift 2;;
         --srcstaccount) SRC_ST_ACCOUNT="$2"; shift 2;;
         --srcstkey) SRC_ST_KEY="$2"; shift 2;;
         --srcstcontainer) SRC_ST_CONTAINER="$2"; shift 2;;
@@ -34,7 +33,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${SCR_DB_NAME}" ||  -z "${$SRC_ST_ACCOUNT}"  || -z "${$SRC_ST_KEY}" || -z "${$SRC_ST_CONTAINER}" || -z "${DIR:-}" ]]; then  
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" ||  -z "${$SRC_ST_ACCOUNT}"  || -z "${$SRC_ST_KEY}" || -z "${$SRC_ST_CONTAINER}" || -z "${DIR:-}" ]]; then  
     die "Missing required parameters."
 fi
 
