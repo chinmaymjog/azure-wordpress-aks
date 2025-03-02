@@ -38,8 +38,8 @@ if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_N
 fi
 
 # Set Azure storage environment variables
-export AZURE_STORAGE_ACCOUNT="$ST_ACCOUNT"
-export AZURE_STORAGE_KEY="$ST_KEY"
+export AZURE_STORAGE_ACCOUNT="$SRC_ST_ACCOUNT"
+export AZURE_STORAGE_KEY="$SRC_ST_KEY"
 
 # Check if Directory exists
 echo "===> Checking if Directory '$DIR' exists..."
