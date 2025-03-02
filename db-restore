@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${$SCR_DB_NAME}" ||  -z "${$SRC_ST_ACCOUNT}"  || -z "${$SRC_ST_KEY}" || -z "${$SRC_ST_CONTAINER}" || -z "${DIR:-}" ]]; then  
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" || -z "${SCR_DB_NAME}" ||  -z "${$SRC_ST_ACCOUNT}"  || -z "${$SRC_ST_KEY}" || -z "${$SRC_ST_CONTAINER}" || -z "${DIR:-}" ]]; then  
     die "Missing required parameters."
 fi
 
