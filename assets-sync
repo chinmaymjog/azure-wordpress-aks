@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_FILESHARE:-}" || -z "${SRC_DIR:-}" || -z "${DST_ST_ACCOUNT:-}" || -z "${DST_ST_KEY:-}" || -z "${DST_ST_FILESHARE:-}" || -z "${DST_DIR:-}" || ]]; then
+if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_FILESHARE:-}" || -z "${SRC_DIR:-}" || -z "${DST_ST_ACCOUNT:-}" || -z "${DST_ST_KEY:-}" || -z "${DST_ST_FILESHARE:-}" || -z "${DST_DIR:-}" ]]; then
     die "Missing required parameters."
 fi
 
@@ -53,7 +53,7 @@ else
 fi  
 
 echo "===> Downloading files from source storage."
-if ! azcopy copy "https://$SRC_ST_ACCOUNT.blob.core.windows.net/$SRC_ST_FILESHARE/$SRC_DIR/*" "$TMPDIR/" --recursive; then
+if ! az storage file download-batch --destination "$TMPDIR" --source "$SRC_ST_FILESHARE/$SRC_DIR"; then
     die "Failed to download files from source fileshare."
 fi
 
@@ -69,9 +69,12 @@ else
 fi  
 
 echo "===> Uploading files to destination storage."
-if ! azcopy copy "$TMPDIR/*" "https://$DST_ST_ACCOUNT.blob.core.windows.net/$DST_ST_FILESHARE/$DST_DIR" --recursive; then
+if ! az storage file upload-batch --destination "$DST_ST_FILESHARE/$DST_DIR" --source "$TMPDIR"; then
     die "Failed to upload files to destination fileshare."
 fi
+
+
+
 
 # Cleanup temporary files
 echo "===> Cleaning up temporary files."
