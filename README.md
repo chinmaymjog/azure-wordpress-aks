@@ -11,14 +11,14 @@ A highly optimized and hardened base image for enterprise WordPress deployments.
 
 ## 🧱 Ecosystem Integration
 
-This base image is designed to power the **[WordPress Enterprise Boilerplate](https://github.com/your-username/wp-boilerplate)**.
+This base image is designed to power the **[WordPress Enterprise Boilerplate](https://github.com/chinmaymjog/wp-boilerplate)**.
 
 ## 🛠️ Usage
 
 Use this image as the `FROM` instruction in your application Dockerfile:
 
 ```dockerfile
-FROM your-registry/wp-base:latest
+FROM chinmaymjog/wp-base:latest
 COPY ./src /var/www/html
 ```
 
