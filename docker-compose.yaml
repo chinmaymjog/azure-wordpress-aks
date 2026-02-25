@@ -14,7 +14,7 @@ services:
   wp:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     container_name: wp
     environment:
       - WORDPRESS_DB_HOST=mysql
