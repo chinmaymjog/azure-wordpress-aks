@@ -1,20 +1,11 @@
-# 🎨 Azure WordPress Stack: Tier 3 - Static Assets (Themes & Plugins)
+# 🎨 Static Assets (Themes & Plugins)
 
-> **Part 3 of the Azure WordPress Stack ecosystem.**
+A standardized way to manage the common pool of WordPress themes and plugins - part of the [azure-wordpress-aks](../../README.md) repo.
 
-A standardized repository for managing custom WordPress themes and plugins in an enterprise environment. Designed for seamless integration with Kubernetes-based deployment pipelines.
+## 🔗 Related Components
 
-## 🔗 Project Ecosystem Navigation
-
-You are currently at **Step 3: Static Assets**.
-
-* **Previous Step:** [Step 2: Base Docker Image (azure-wp-stack-docker-base)](https://github.com/chinmaymjog/azure-wp-stack-docker-base) - The underlying PHP/Nginx container.
-* **Next Step:** [Step 4: Helm Chart Deployment (azure-wp-stack-helm-chart)](https://github.com/chinmaymjog/azure-wp-stack-helm-chart) - Deploy the application using GitOps.
-* **Full Ecosystem:**
-  * 1️⃣ [Infrastructure](https://github.com/chinmaymjog/azure-wp-stack-infrastructure)
-  * 2️⃣ [Base Docker Image](https://github.com/chinmaymjog/azure-wp-stack-docker-base)
-  * 3️⃣ **Static Assets** (You are here)
-  * 4️⃣ [Helm Chart Deployment & App Boilerplate](https://github.com/chinmaymjog/azure-wp-stack-helm-chart)
+* [../docker-base](../docker-base/README.md) - the base WordPress runtime image this pool layers onto.
+* [../../charts](../../charts/README.md) - the Helm chart and site-specific Dockerfile that select which of these plugins/themes a given site actually ships.
 
 ---
 

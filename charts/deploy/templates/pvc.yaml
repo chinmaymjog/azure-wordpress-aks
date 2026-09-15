@@ -9,6 +9,10 @@ spec:
     - ReadWriteMany
   azureFile:
     secretName: azure-secret
+    # PersistentVolumes are cluster-scoped, so the Secret reference needs
+    # an explicit namespace - it defaults to "default" otherwise, which
+    # doesn't match where secret.yaml actually creates azure-secret.
+    secretNamespace: {{ .Values.app.namespace }}
     shareName: {{ .Values.app.pvc.share }}
     readOnly: false
   persistentVolumeReclaimPolicy: Retain
@@ -17,8 +21,11 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ .Values.app.name }}
-
+  namespace: {{ .Values.app.namespace }}
 spec:
+  # Binds this PVC to its own same-named PV above explicitly, rather than
+  # relying on capacity/accessMode matching alone to find the right one.
+  volumeName: {{ .Values.app.name }}
   accessModes:
     - ReadWriteMany
   storageClassName: ""
