@@ -1,0 +1,35 @@
+default:
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker info && docker login -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD" $DOCKER_REGISTRY
+
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
+docker-build:
+  stage: build
+  # Default branch leaves tag empty (= latest tag)
+  # All other branches are tagged with the escaped branch name (commit ref slug)
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag=""
+        echo "Running on default branch '$CI_DEFAULT_BRANCH': tag = 'latest'"
+      elif [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+        tag=":develop"
+        echo "Running on branch 'develop': tag = ':develop'"
+      else
+        tag=":$CI_COMMIT_REF_SLUG"
+        echo "Running on branch '$CI_COMMIT_BRANCH': tag = $tag"
+      fi
+    - docker build --pull -t "$DOCKER_REGISTRY_NAME/$CI_PROJECT_NAME${tag}" .
+    - docker push "$DOCKER_REGISTRY_NAME/$CI_PROJECT_NAME${tag}"
+  # Run this job in a branch where a Dockerfile exists
+  # when: manual
+  tags:
+    - docker
