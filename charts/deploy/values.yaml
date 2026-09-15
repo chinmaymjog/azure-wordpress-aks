@@ -1,0 +1,22 @@
+app:
+  env: $ENV
+  name: $APP_NAME
+  image:
+    registry: $CR_REPO
+    repository: $APP_LOCATION
+    tag: $IMAGE_TAG
+  replicas: 1
+  pvc:
+    share: $PVC_FILESHARE
+    path: $APP_ENV_LOCATION
+  hosts:
+    - host: $SITE_URL
+  limits:
+    memory: "128Mi"
+    cpu: "500m"
+
+database:
+  db_host: $DB_HOST
+  db_name: $DB_NAME
+  db_user: $DB_ADMIN
+  db_pass: $DB_PASS

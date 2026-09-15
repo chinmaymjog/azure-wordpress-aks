@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.name }}
+  
+spec:
+  replicas: {{ .Values.app.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app.name }}
+    spec:
+      containers:
+      - name: {{ .Values.app.name }}
+        image: {{ .Values.app.image.registry }}/{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: {{ .Values.database.db_host }}
+        - name: WORDPRESS_DB_NAME
+          value: {{ .Values.database.db_name }}
+        - name: WORDPRESS_DB_USER
+          value: {{ .Values.database.db_user }}
+        - name: WORDPRESS_DB_PASSWORD       
+          value: {{ .Values.database.db_pass }}  
+        resources:
+          limits:
+            memory: {{ .Values.app.limits.memory}}
+            cpu: {{ .Values.app.limits.cpu}}
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - mountPath: /usr/src/wordpress/wp-content/uploads
+            name: nfs-mount
+            subPath: {{ .Values.app.pvc.path }}/uploads
+          - mountPath: /usr/src/wordpress/.htaccess
+            name: nfs-mount
+            subPath: {{ .Values.app.pvc.path }}/{{ .Values.app.name }}.htaccess
+      imagePullSecrets:
+        - name: cr-auth
+      volumes:
+      - name: nfs-mount
+        persistentVolumeClaim:
+          claimName: {{ .Values.app.name }}
