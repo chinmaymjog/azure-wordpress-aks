@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql
+    container_name: mysql
+    user: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=P@s$w0rD
+      - MYSQL_DATABASE=wp-base
+      - MYSQL_USER=wp-user
+      - MYSQL_PASSWORD=SeCret
+    volumes:
+      - ./tmp:/var/lib/mysql
+
+  wordpress:
+    build: .
+    image: wordpress-boilerplate:v1.0.0
+    container_name: wordpress
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - WORDPRESS_DB_HOST=mysql
+      - WORDPRESS_DB_NAME=wp-base
+      - WORDPRESS_DB_USER=wp-user
+      - WORDPRESS_DB_PASSWORD=SeCret

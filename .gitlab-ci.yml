@@ -1,0 +1,440 @@
+default:
+  image: chinmaymjog/cicd-toolkit:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker info && docker login -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD" $DOCKER_REGISTRY
+
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  WP_BASE_IMAGE: chinmaymjog/azure-wp-stack-docker-base:latest
+
+stages:
+  - generate
+  - build
+  - stop_env
+  - db_migrations
+  - asset_sync
+  - deploy
+
+.dev_ref:
+  environment:
+    name: "development"
+    url: "https://$ENV-$CI_COMMIT_REF_SLUG-$CI_PROJECT_NAME.apps.example.com"
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH && $CI_COMMIT_TAG == null
+  tags:
+    - docker
+  when: manual
+
+.preprod_ref:
+  environment:
+    name: "pre-production"
+    url: "https://$ENV-$CI_PROJECT_NAME.apps.example.com"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  tags:
+    - docker
+  when: manual
+
+.prod_ref:
+  environment:
+    name: "production"
+    url: "https://$SITE_DOMAIN"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+  tags:
+    - docker
+  when: manual
+
+.build_image: &build_image
+  - echo $IMAGE_TAG
+  - docker build -t "$DOCKER_REGISTRY_NAME/$CI_PROJECT_NAME:$IMAGE_TAG" .
+  - docker push "$DOCKER_REGISTRY_NAME/$CI_PROJECT_NAME:$IMAGE_TAG"
+
+.db_create: &db_create
+  - db-create --host $DB_HOST --admin $DB_ADMIN --password $DB_PASS --dbname $DB_NAME
+
+.db_dump: &db_dump
+  - db-dump --host $DB_HOST --admin $DB_ADMIN --password $DB_PASS --dbname $DB_NAME --staccount $SNAPSHOT_STORAGE_ACCOUNT --stkey $SNAPSHOT_STORAGE_ACCOUNT_KEY --stcontainer $SNAPSHOT_CONTAINER --path $APP_ENV_LOCATION
+
+.db_restore: &db_restore
+  - |
+    case "$SRC_ENV" in 
+      "preprod") 
+        SRC_APP_NAME="$SRC_ENV-$CI_PROJECT_NAME"
+        SRC_APP_ENV_LOCATION="$CI_PROJECT_NAME/$SRC_ENV" ;;
+      "prod") 
+        SRC_APP_NAME="$SRC_ENV-$CI_PROJECT_NAME"
+        SRC_APP_ENV_LOCATION="$CI_PROJECT_NAME/$SRC_ENV" ;;
+    esac
+  - echo "===> Restoring database from $SRC_APP_NAME environment"
+  - db-restore --host $DB_HOST --admin $DB_ADMIN --password $DB_PASS --dbname $DB_NAME --srcstaccount $SNAPSHOT_STORAGE_ACCOUNT --srcstkey $SNAPSHOT_STORAGE_ACCOUNT_KEY --srcstcontainer $SNAPSHOT_CONTAINER --path $SRC_APP_ENV_LOCATION
+
+.db_migrate: &db_migrate
+  - |
+    case "$SRC_ENV" in 
+      "preprod") 
+        SRC_URL="$SRC_ENV-$CI_PROJECT_NAME.apps.example.com" ;;
+      "prod") 
+        SRC_URL="$SRC_ENV-$CI_PROJECT_NAME.apps.example.com" ;;
+    esac
+  - echo "===> Replacing site URLs in database from $SRC_URL to $SITE_URL environment"
+  - docker run --user www-data --rm -e "WORDPRESS_DB_HOST=$DB_HOST" -e "WORDPRESS_DB_USER=$DB_ADMIN" -e "WORDPRESS_DB_PASSWORD=$DB_PASS" -e "WORDPRESS_DB_NAME=$DB_NAME" $WP_BASE_IMAGE wp search-replace $SRC_URL $SITE_URL --skip-columns=guid
+
+.filesystem_create: &filesystem_create
+  - fileshare-create --staccount $PVC_STORAGE_ACCOUNT --stkey $PVC_STORAGE_ACCOUNT_KEY --stfileshare $PVC_FILESHARE --dir $APP_LOCATION
+  - fileshare-create --staccount $PVC_STORAGE_ACCOUNT --stkey $PVC_STORAGE_ACCOUNT_KEY --stfileshare $PVC_FILESHARE --dir $APP_ENV_LOCATION
+  - cat $HTACCESS_FILE > $APP_NAME.htaccess
+  - cat $APP_NAME.htaccess
+  - file-upload --staccount $PVC_STORAGE_ACCOUNT --stkey $PVC_STORAGE_ACCOUNT_KEY --stfileshare $PVC_FILESHARE --dir $APP_ENV_LOCATION --file $APP_NAME.htaccess
+  - container-create --staccount $SNAPSHOT_STORAGE_ACCOUNT --stkey $SNAPSHOT_STORAGE_ACCOUNT_KEY --stcontainer $SNAPSHOT_CONTAINER --dir $APP_LOCATION
+  - container-create --staccount $SNAPSHOT_STORAGE_ACCOUNT --stkey $SNAPSHOT_STORAGE_ACCOUNT_KEY --stcontainer $SNAPSHOT_CONTAINER --dir $APP_ENV_LOCATION
+
+.assets_sync: &assets_sync
+  - |
+    case "$SRC_ENV" in 
+      "preprod") 
+        SRC_APP_NAME="$SRC_ENV-$CI_PROJECT_NAME"
+        SRC_APP_ENV_LOCATION="$CI_PROJECT_NAME/$SRC_ENV" ;;
+      "prod") 
+        SRC_APP_NAME="$SRC_ENV-$CI_PROJECT_NAME"
+        SRC_APP_ENV_LOCATION="$CI_PROJECT_NAME/$SRC_ENV" ;;
+    esac
+  - echo "===> Syncing assests from $SRC_APP_NAME environment"
+  - assets-sync --srcstaccount $SRC_ST_ACCOUNT --srcstkey $SRC_ST_KEY --srcstfileshare $SRC_ST_FILESHARE --srcpath $SRC_APP_ENV_LOCATION --dststaccount $DST_ST_ACCOUNT --dststkey $DST_ST_KEY --dststfileshare $DST_ST_FILESHARE --dstpath $APP_ENV_LOCATION
+
+.aks_deploy: &aks_deploy
+  - kubectl config set-cluster $AKS_CLUSTER --server=$AKS_SERVER --certificate-authority=$AKS_CA
+  - kubectl config set-credentials $AKS_USER --token=$AKS_TOKEN
+  - kubectl config set-context $AKS_CLUSTER --cluster=$AKS_CLUSTER --user=$AKS_USER
+  - kubectl config use-context $AKS_CLUSTER
+  - envsubst < ./deploy/namespace.yaml > ./deploy/$APP_NAME-namespace.yaml
+  - cat ./deploy/$APP_NAME-namespace.yaml
+  - kubectl apply -f ./deploy/$APP_NAME-namespace.yaml --namespace $APP_LOCATION
+  - envsubst < ./deploy/secret.yaml > ./deploy/$APP_NAME-secret.yaml
+  - cat ./deploy/$APP_NAME-secret.yaml
+  - kubectl apply -f ./deploy/$APP_NAME-secret.yaml --namespace $APP_LOCATION
+  - envsubst < ./deploy/values.yaml > ./deploy/$APP_NAME-values.yaml
+  - cat ./deploy/$APP_NAME-values.yaml
+  - helm upgrade --install $APP_NAME --namespace $APP_LOCATION --create-namespace ./deploy -f ./deploy/$APP_NAME-values.yaml
+  - rm -f ~/.kube/config
+
+.stop_env: &stop_env
+  - kubectl config set-cluster $AKS_CLUSTER --server=$AKS_SERVER --certificate-authority=$AKS_CA
+  - kubectl config set-credentials $AKS_USER --token=$AKS_TOKEN
+  - kubectl config set-context $AKS_CLUSTER --cluster=$AKS_CLUSTER --user=$AKS_USER
+  - kubectl config use-context $AKS_CLUSTER
+  - kubectl scale --namespace $APP_LOCATION deployment/$APP_NAME --replicas 0
+
+generate_variable:
+  stage: generate
+  script:
+    - echo "Generating he environment based on branch/tag"
+    - |
+      case "$CI_COMMIT_REF_NAME" in
+        "$CI_DEFAULT_BRANCH") ENV="preprod" ;;
+        v[0-9]*.[0-9]*.[0-9]*) ENV="prod" ;;
+        *) ENV="dev" ;;
+      esac
+    - |
+      # Define constants
+      echo APP_LOCATION="$CI_PROJECT_NAME" >> .env
+    - |
+      # Set IMAGE_TAG based on environment
+      if [[ "$ENV" == "preprod" ]]; then
+        echo ENV="$ENV" >> .env
+        echo IMAGE_TAG="preprod"  >> .env 
+        echo APP_NAME="$ENV-$CI_PROJECT_NAME" >> .env
+        echo APP_ENV_LOCATION="$CI_PROJECT_NAME/$ENV" >> .env 
+        echo DB_NAME="$ENV-$CI_PROJECT_NAME" >> .env
+        echo SITE_URL="$ENV-$CI_PROJECT_NAME.apps.example.com" >> .env
+      elif [[ "$ENV" == "prod" ]]; then
+        echo ENV="$ENV" >> .env
+        echo IMAGE_TAG="latest" >> .env
+        echo APP_NAME="$ENV-$CI_PROJECT_NAME" >> .env
+        echo APP_ENV_LOCATION="$CI_PROJECT_NAME/$ENV" >> .env
+        echo DB_NAME="$ENV-$CI_PROJECT_NAME" >> .env
+        echo SITE_URL="$SITE_DOMAIN" >> .env
+      else
+        echo ENV="$ENV" >> .env
+        echo IMAGE_TAG="$CI_COMMIT_REF_SLUG" >> .env
+        echo APP_NAME="$ENV-$CI_COMMIT_REF_SLUG" >> .env
+        echo APP_ENV_LOCATION="$CI_PROJECT_NAME/$CI_COMMIT_REF_SLUG" >> .env
+        echo DB_NAME="$ENV-$CI_COMMIT_REF_SLUG" >> .env
+        echo SITE_URL="$ENV-$CI_COMMIT_REF_SLUG-$CI_PROJECT_NAME.apps.example.com" >> .env
+      fi
+    - cat .env
+  artifacts:
+    reports:
+      dotenv: .env
+  tags:
+    - docker
+
+dev_build:
+  stage: build
+  script:
+    - *build_image
+  extends: .dev_ref
+
+dev_db_create:
+  stage: build
+  variables:
+    DB_HOST: $DEV_DB_HOST
+    DB_ADMIN: $DEV_DB_ADMIN
+    DB_PASS: $DEV_DB_PASS
+  script:
+    - *db_create
+    - *filesystem_create
+  extends: .dev_ref
+
+stop_dev:
+  stage: stop_env
+  variables:
+    AKS_SERVER: $DEV_AKS_SERVER
+    AKS_CA: $DEV_AKS_CA
+    AKS_USER: $DEV_AKS_USER
+    AKS_TOKEN: $DEV_AKS_TOKEN
+    AKS_CLUSTER: $DEV_AKS_NAME
+  script:
+    - *stop_env
+  extends: .dev_ref
+
+dump_dev:
+  stage: db_migrations
+  variables:
+    DB_HOST: $DEV_DB_HOST
+    DB_ADMIN: $DEV_DB_ADMIN
+    DB_PASS: $DEV_DB_PASS
+  script:
+    - *db_dump
+  extends: .dev_ref
+
+migrate_preprod_dev:
+  stage: db_migrations
+  variables:
+    DB_HOST: $DEV_DB_HOST
+    DB_ADMIN: $DEV_DB_ADMIN
+    DB_PASS: $DEV_DB_PASS
+    SRC_ENV: "preprod"
+  script:
+    - *db_restore
+    - *db_migrate
+  extends: .dev_ref
+
+migrate_prod_dev:
+  stage: db_migrations
+  variables:
+    DB_HOST: $DEV_DB_HOST
+    DB_ADMIN: $DEV_DB_ADMIN
+    DB_PASS: $DEV_DB_PASS
+    SRC_ENV: "prod"
+  script:
+    - *db_restore
+    - *db_migrate
+  extends: .dev_ref
+
+asset_sync_preprod_dev:
+  stage: asset_sync
+  variables:
+    SRC_ENV: "preprod"
+    SRC_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    SRC_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    SRC_ST_FILESHARE: $PVC_FILESHARE
+    DST_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    DST_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    DST_ST_FILESHARE: $PVC_FILESHARE
+  script:
+    - *assets_sync
+  extends: .dev_ref
+
+asset_sync_prod_dev:
+  stage: asset_sync
+  variables:
+    SRC_ENV: "prod"
+    SRC_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    SRC_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    SRC_ST_FILESHARE: $PVC_FILESHARE
+    DST_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    DST_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    DST_ST_FILESHARE: $PVC_FILESHARE
+  script:
+    - *assets_sync
+  extends: .dev_ref
+
+dev_deploy:
+  stage: deploy
+  variables:
+    AKS_SERVER: $DEV_AKS_SERVER
+    AKS_CA: $DEV_AKS_CA
+    AKS_USER: $DEV_AKS_USER
+    AKS_TOKEN: $DEV_AKS_TOKEN
+    AKS_CLUSTER: $DEV_AKS_NAME
+    DB_HOST: $DEV_DB_HOST
+    DB_ADMIN: $DEV_DB_ADMIN
+    DB_PASS: $DEV_DB_PASS
+  script:
+    - *aks_deploy
+  extends: .dev_ref
+
+preprod_build:
+  stage: build
+  script:
+    - *build_image
+  extends: .preprod_ref
+
+preprod_db_create:
+  stage: build
+  variables:
+    DB_HOST: $PREPROD_DB_HOST
+    DB_ADMIN: $PREPROD_DB_ADMIN
+    DB_PASS: $PREPROD_DB_PASS
+  script:
+    - *db_create
+    - *filesystem_create
+  extends: .preprod_ref
+
+stop_preprod:
+  stage: stop_env
+  variables:
+    AKS_SERVER: $PREPROD_AKS_SERVER
+    AKS_CA: $PREPROD_AKS_CA
+    AKS_USER: $PREPROD_AKS_USER
+    AKS_TOKEN: $PREPROD_AKS_TOKEN
+    AKS_CLUSTER: $PREPROD_AKS_NAME
+  script:
+    - *stop_env
+  extends: .preprod_ref
+
+dump_preprod:
+  stage: db_migrations
+  variables:
+    DB_HOST: $PREPROD_DB_HOST
+    DB_ADMIN: $PREPROD_DB_ADMIN
+    DB_PASS: $PREPROD_DB_PASS
+  script:
+    - *db_dump
+  extends: .preprod_ref
+
+migrate_prod_preprod:
+  stage: db_migrations
+  variables:
+    DB_HOST: $PREPROD_DB_HOST
+    DB_ADMIN: $PREPROD_DB_ADMIN
+    DB_PASS: $PREPROD_DB_PASS
+    SRC_ENV: "prod"
+  script:
+    - *db_restore
+    - *db_migrate
+  extends: .preprod_ref
+
+asset_sync_prod_preprod:
+  stage: asset_sync
+  variables:
+    SRC_ENV: "prod"
+    SRC_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    SRC_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    SRC_ST_FILESHARE: $PVC_FILESHARE
+    DST_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    DST_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    DST_ST_FILESHARE: $PVC_FILESHARE
+  script:
+    - *assets_sync
+  extends: .preprod_ref
+
+preprod_deploy:
+  stage: deploy
+  variables:
+    AKS_SERVER: $PREPROD_AKS_SERVER
+    AKS_CA: $PREPROD_AKS_CA
+    AKS_USER: $PREPROD_AKS_USER
+    AKS_TOKEN: $PREPROD_AKS_TOKEN
+    AKS_CLUSTER: $PREPROD_AKS_NAME
+    DB_HOST: $PREPROD_DB_HOST
+    DB_ADMIN: $PREPROD_DB_ADMIN
+    DB_PASS: $PREPROD_DB_PASS
+  script:
+    - *aks_deploy
+  extends: .preprod_ref
+
+prod_build:
+  stage: build
+  script:
+    - *build_image
+  extends: .prod_ref
+
+prod_db_create:
+  stage: build
+  variables:
+    DB_HOST: $PROD_DB_HOST
+    DB_ADMIN: $PROD_DB_ADMIN
+    DB_PASS: $PROD_DB_PASS
+  script:
+    - *db_create
+    - *filesystem_create
+  extends: .prod_ref
+
+stop_prod:
+  stage: stop_env
+  variables:
+    AKS_SERVER: $PROD_AKS_SERVER
+    AKS_CA: $PROD_AKS_CA
+    AKS_USER: $PROD_AKS_USER
+    AKS_TOKEN: $PROD_AKS_TOKEN
+    AKS_CLUSTER: $PROD_AKS_NAME
+  script:
+    - *stop_env
+  extends: .prod_ref
+
+dump_prod:
+  stage: db_migrations
+  variables:
+    DB_HOST: $PROD_DB_HOST
+    DB_ADMIN: $PROD_DB_ADMIN
+    DB_PASS: $PROD_DB_PASS
+  script:
+    - *db_dump
+  extends: .prod_ref
+
+migrate_preprod_prod:
+  stage: db_migrations
+  variables:
+    DB_HOST: $PROD_DB_HOST
+    DB_ADMIN: $PROD_DB_ADMIN
+    DB_PASS: $PROD_DB_PASS
+    SRC_ENV: "preprod"
+  script:
+    - *db_restore
+    - *db_migrate
+  extends: .prod_ref
+
+asset_sync_preprod_prod:
+  stage: asset_sync
+  variables:
+    SRC_ENV: "preprod"
+    SRC_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    SRC_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    SRC_ST_FILESHARE: $PVC_FILESHARE
+    DST_ST_ACCOUNT: $PVC_STORAGE_ACCOUNT
+    DST_ST_KEY: $PVC_STORAGE_ACCOUNT_KEY
+    DST_ST_FILESHARE: $PVC_FILESHARE
+  script:
+    - *assets_sync
+  extends: .prod_ref
+
+prod_deploy:
+  stage: deploy
+  variables:
+    AKS_SERVER: $PROD_AKS_SERVER
+    AKS_CA: $PROD_AKS_CA
+    AKS_USER: $PROD_AKS_USER
+    AKS_TOKEN: $PROD_AKS_TOKEN
+    AKS_CLUSTER: $PROD_AKS_NAME
+    DB_HOST: $PROD_DB_HOST
+    DB_ADMIN: $PROD_DB_ADMIN
+    DB_PASS: $PROD_DB_PASS
+  script:
+    - *aks_deploy
+  extends: .prod_ref
