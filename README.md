@@ -1,6 +1,12 @@
 # ☁️ Azure WordPress on AKS
 
-A containerized WordPress deployment for Azure Kubernetes Service - the application layer for the [azure-wordpress-aks-infra](https://github.com/chinmaymjog/azure-wordpress-aks-infra) platform. WordPress is the reference workload; the point of this repo is the platform pattern around it: a layered container build, a Helm chart driving Kubernetes deployment, and GitHub Actions CI/CD that builds, pushes, and deploys with no static cloud credentials.
+A containerized WordPress deployment for Azure Kubernetes Service - the application layer for the [azure-wordpress-aks-infra](https://github.com/chinmaymjog/azure-wordpress-aks-infra) platform. WordPress is the reference workload; the point of this repo is the platform pattern around it: a layered container build and a Helm chart driving Kubernetes deployment.
+
+## System Docs
+
+- Project specification: [docs/project-spec.md](docs/project-spec.md)
+- Architecture decisions: [docs/architecture.md](docs/architecture.md)
+- Execution tracker: [docs/tasks.md](docs/tasks.md)
 
 ## 📦 Structure
 
@@ -20,8 +26,8 @@ scripts/
   fileshare-create, file-upload,        # Azure Files provisioning
   container-create, assets-sync         # Blob snapshot storage, env-to-env asset sync
 .github/workflows/
-  build.yml    # Builds & pushes all three images to ACR (az acr build, OIDC)
-  deploy.yml   # helm upgrade --install onto AKS (az aks command invoke, OIDC)
+  verify.yml   # helm lint + helm template on every push/PR - no cloud
+                # credentials needed
 ```
 
 See each subdirectory's own README for details. The companion
@@ -29,23 +35,26 @@ See each subdirectory's own README for details. The companion
 repo provisions everything this deploys onto: the AKS cluster, ACR, and
 managed MySQL database.
 
+Want automated CI/CD instead of running the commands below by hand? Check
+out the [`advanced` branch](https://github.com/chinmaymjog/azure-wordpress-aks/tree/advanced)
+- GitHub Actions workflows that build/push/deploy via OIDC, with a
+dev/preprod/prod environment model.
+
 ## 🏗️ How It Fits Together
 
 ```mermaid
 graph LR
     A[docker-base image] --> C[site image]
     B[static-assets image] --> C
-    C -->|az acr build, OIDC| D[Azure Container Registry]
+    C -->|az acr build| D[Azure Container Registry]
     D -->|kubelet AcrPull identity| E[AKS]
-    F[Helm chart] -->|az aks command invoke, OIDC| E
+    F[Helm chart] -->|helm upgrade| E
     E --> G[Azure Files PVC]
     E --> H[Azure MySQL Flexible Server]
 ```
 
-- Images are pushed via `az acr build` - the build happens on ACR's own build service, not the CI runner, and there's no registry password to manage.
-- AKS pulls images via its kubelet identity's `AcrPull` role (see the infra repo) - no image pull secret needed for the default path.
-- Deploys run via `az aks command invoke`, which executes `helm upgrade` from inside the cluster's control plane through the Azure API. This matters because the infra repo's AKS API server has `authorized_ip_ranges` configured, and GitHub-hosted runners have no fixed IP to allowlist - `command invoke` needs no direct network path to the API server at all.
-- WordPress uploads persist on an Azure Files share mounted as a PVC, shared across the web replicas.
+- AKS pulls images via its kubelet identity's `AcrPull` role (see the infra repo) - no image pull secret needed.
+- WordPress uploads persist on an Azure Files share mounted as a PVC, shared across web replicas.
 
 ## 🚀 Local Development
 
@@ -59,20 +68,61 @@ builds `charts/Dockerfile` directly, which by default pulls its base
 images from GHCR (`ghcr.io/chinmaymjog/azure-wordpress-aks/...`) - override
 with `--build-arg` if you're pointing at your own registry.
 
-## 🔄 CI/CD Setup
+## ☁️ Deploy to Your AKS Cluster
 
-Both workflows authenticate via OIDC - no client secret stored in GitHub. One-time setup:
+Once [azure-wordpress-aks-infra](https://github.com/chinmaymjog/azure-wordpress-aks-infra)
+is deployed, get its outputs first:
+```bash
+# from the infra repo
+ACR_NAME=$(cd hub && terraform output -raw acrname)
+DB_HOST=$(cd database && terraform output -raw mysql_fqdn)
+STORAGE_ACCOUNT=$(cd database && terraform output -raw storage_account_name)
+```
 
-1. **Azure AD App Registration with a federated credential** (see the infra repo's README for the exact `az ad app`/`federated-credential` commands - reuse the same app registration for both repos, or create a separate one scoped just to ACR push + `az aks command invoke`).
-2. **Repository secrets**: `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID`, `DB_PASSWORD`, `STORAGE_ACCOUNT_KEY`.
-3. **Repository variables** (Settings > Secrets and variables > Actions > Variables), from the infra repo's `terraform output`:
-   - `ACR_NAME` (`terraform output acrname` in `hub/`)
-   - `AKS_NAME`, `AKS_RESOURCE_GROUP` (`terraform output` in `aks/`)
-   - `DB_HOST`, `DB_ADMIN_USER` (`terraform output` in `database/`)
-   - `STORAGE_ACCOUNT_NAME` (`terraform output storage_account_name` in `database/`)
-   - `PVC_FILESHARE`, `SITE_DOMAIN` - your own values.
-4. **Build**: push to `main`/`develop` or tag `v*.*.*` triggers `build.yml`.
-5. **Deploy**: run `deploy.yml` manually from the Actions tab with the image tag `build.yml` produced. `main` deploys to `preprod`, a version tag deploys to `prod`, anything else deploys to `dev` - each behind its own GitHub Environment, so you can gate `prod` with required reviewers under Settings > Environments.
+### 1. Build & push the three images
+```bash
+az acr build --registry "$ACR_NAME" --image docker-base:latest containers/docker-base
+az acr build --registry "$ACR_NAME" --image static-assets:latest containers/static-assets
+cd charts
+az acr build --registry "$ACR_NAME" --image wordpress:latest \
+  --build-arg STATIC_ASSETS_IMAGE="$ACR_NAME.azurecr.io/static-assets:latest" \
+  --build-arg DOCKER_BASE_IMAGE="$ACR_NAME.azurecr.io/docker-base:latest" \
+  .
+cd ..
+```
+
+### 2. Create the Azure Files share for WordPress uploads
+```bash
+STORAGE_KEY=$(az storage account keys list --account-name "$STORAGE_ACCOUNT" --query '[0].value' -o tsv)
+./scripts/fileshare-create --staccount "$STORAGE_ACCOUNT" --stkey "$STORAGE_KEY" --stfileshare wordpress --dir uploads
+```
+
+### 3. Deploy with Helm
+```bash
+az aks get-credentials --resource-group rg-aks-<project>-main-weu --name aks-<project>-main-weu
+
+helm upgrade --install wordpress ./charts/deploy \
+  --namespace wordpress --create-namespace \
+  --set app.image.registry="$ACR_NAME.azurecr.io" \
+  --set app.image.repository=wordpress \
+  --set app.image.tag=latest \
+  --set app.pvc.share=wordpress \
+  --set app.hosts[0].host=<your-domain-or-nip.io-address> \
+  --set database.db_host="$DB_HOST" \
+  --set database.db_name=wordpress \
+  --set database.db_user=<db-admin-user-from-infra-output> \
+  --set database.db_pass=<db-admin-password-from-key-vault> \
+  --set azureStorage.accountName="$STORAGE_ACCOUNT" \
+  --set azureStorage.accountKey="$STORAGE_KEY"
+```
+
+`database.db_user`/`db_pass` come from Key Vault (`mysql-<project>-main-user`/`-secret` secrets, see the infra repo).
+
+### 4. Verify
+```bash
+kubectl get pods -n wordpress
+kubectl get ingress -n wordpress
+```
 
 ## 🛡️ License
 Distributed under the MIT License. See `LICENSE` in each subdirectory.
