@@ -1,0 +1,42 @@
+#!/bin/bash
+
+theme_url="https://downloads.wordpress.org/theme"
+theme_list="common-themes.list"
+plugin_url="https://downloads.wordpress.org/plugin"
+plugin_list="common-plugins.list"
+
+# Function to download and extract plugins
+download_plugin() {
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        wget "$plugin_url/$line.zip" -O "$line.zip" || {
+            echo "Failed to download plugin: $line"
+            continue
+        }
+        unzip "$line.zip" -d ../plugins || {
+            echo "Failed to unzip plugin: $line"
+            rm -f "$line.zip"
+            continue
+        }
+        rm -f "$line.zip"
+    done < "$plugin_list"
+}
+
+# Function to download and extract themes
+download_theme() {
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        wget "$theme_url/$line.zip" -O "$line.zip" || {
+            echo "Failed to download theme: $line"
+            continue
+        }
+        unzip "$line.zip" -d ../themes || {
+            echo "Failed to unzip theme: $line"
+            rm -f "$line.zip"
+            continue
+        }
+        rm -f "$line.zip"
+    done < "$theme_list"
+}
+
+# Main execution
+download_theme
+download_plugin

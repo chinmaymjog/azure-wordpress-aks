@@ -1,0 +1,54 @@
+#!/bin/bash
+
+theme_list="/pkg-mgr/themes.list"
+plugin_list="/pkg-mgr/plugins.list"
+
+while getopts "t:" flag; do
+  case "$flag" in
+    t) # Handle the -t flag with an argument
+       pkgtype="$OPTARG"
+       ;;
+    *) echo "Invalid option"; exit 1 ;;
+  esac
+done
+
+# Check if pkgtype is set
+if [ -z "$pkgtype" ]; then
+  echo "Error: Package type (-t) is required"
+  exit 1
+fi
+
+copy_pkgs() {
+  echo "===> Copying $pkgtype to the temp location"
+  
+  # Determine the list file based on the package type
+  list_file=""
+  if [ "$pkgtype" = "themes" ]; then
+    list_file="$theme_list"
+  elif [ "$pkgtype" = "plugins" ]; then
+    list_file="$plugin_list"
+  else
+    echo "Error: Invalid package type. Use 'themes' or 'plugins'."
+    exit 1
+  fi
+
+  # Read and copy packages
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    src_dir="/$pkgtype/$line"
+    dest_dir="/common-$pkgtype"
+
+    if [ ! -d "$dest_dir" ]; then
+      mkdir -p "$dest_dir"
+    fi
+
+    if [ -e "$src_dir" ]; then
+      cp -r "$src_dir" "$dest_dir"
+      echo "Copied $line to $dest_dir"
+    else
+      echo "Warning: $src_dir does not exist"
+    fi
+  done < "$list_file"
+}
+
+# Call the function
+copy_pkgs
