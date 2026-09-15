@@ -25,7 +25,7 @@ jobs:
     steps:
       - id: set
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/advanced" ]]; then
             echo "env=preprod" >> "$GITHUB_OUTPUT"
             echo "app_name=preprod-wordpress" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
