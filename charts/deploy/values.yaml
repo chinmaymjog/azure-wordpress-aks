@@ -1,22 +1,47 @@
+# Default values for the WordPress chart. Override per-environment values
+# with `helm upgrade --install -f <env-values>.yaml` or `--set key=value` -
+# see the repo README for the CI-driven flow.
+
 app:
-  env: $ENV
-  name: $APP_NAME
+  env: dev
+  name: wordpress
+  namespace: wordpress
   image:
-    registry: $CR_REPO
-    repository: $APP_LOCATION
-    tag: $IMAGE_TAG
+    registry: ""
+    repository: ""
+    tag: latest
+    # Set to a docker-registry Secret name (see secret.yaml) only if the
+    # registry needs a pull secret. Left empty by default - AKS pulls from
+    # ACR via the kubelet identity's AcrPull role, no secret needed.
+    pullSecret: ""
   replicas: 1
   pvc:
-    share: $PVC_FILESHARE
-    path: $APP_ENV_LOCATION
+    share: ""
+    path: ""
   hosts:
-    - host: $SITE_URL
-  limits:
-    memory: "128Mi"
-    cpu: "500m"
+    - host: wordpress.example.com
+  # Basic-auth gate on the ingress for non-production environments - see
+  # templates/ingress.yaml. Leave basicAuthSecret unset to disable it.
+  basicAuthSecret: ""
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+    limits:
+      memory: "128Mi"
+      cpu: "500m"
 
 database:
-  db_host: $DB_HOST
-  db_name: $DB_NAME
-  db_user: $DB_ADMIN
-  db_pass: $DB_PASS
+  db_host: ""
+  db_name: ""
+  db_user: ""
+  db_pass: ""
+
+# Azure Files-backed PV/PVC (see templates/pvc.yaml) - the storage account
+# key backing this is expected as a Secret named "azure-secret" with
+# azurestorageaccountname/azurestorageaccountkey keys. Provide real values
+# via --set azureStorage.accountName=... --set azureStorage.accountKey=...
+# at deploy time; never commit real values here.
+azureStorage:
+  accountName: ""
+  accountKey: ""
