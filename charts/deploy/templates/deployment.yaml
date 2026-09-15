@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.app.name }}
-  
+  namespace: {{ .Values.app.namespace }}
 spec:
   replicas: {{ .Values.app.replicas }}
   selector:
@@ -13,9 +13,14 @@ spec:
       labels:
         app: {{ .Values.app.name }}
     spec:
+      securityContext:
+        fsGroup: 33 # www-data, so the Azure Files mount is group-writable
       containers:
       - name: {{ .Values.app.name }}
         image: {{ .Values.app.image.registry }}/{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false # Apache/PHP write into the image filesystem outside the mounted paths
         env:
         - name: WORDPRESS_DB_HOST
           value: {{ .Values.database.db_host }}
@@ -23,14 +28,29 @@ spec:
           value: {{ .Values.database.db_name }}
         - name: WORDPRESS_DB_USER
           value: {{ .Values.database.db_user }}
-        - name: WORDPRESS_DB_PASSWORD       
-          value: {{ .Values.database.db_pass }}  
+        - name: WORDPRESS_DB_PASSWORD
+          value: {{ .Values.database.db_pass }}
         resources:
+          requests:
+            memory: {{ .Values.app.resources.requests.memory }}
+            cpu: {{ .Values.app.resources.requests.cpu }}
           limits:
-            memory: {{ .Values.app.limits.memory}}
-            cpu: {{ .Values.app.limits.cpu}}
+            memory: {{ .Values.app.resources.limits.memory }}
+            cpu: {{ .Values.app.resources.limits.cpu }}
         ports:
         - containerPort: 80
+        livenessProbe:
+          httpGet:
+            path: /wp-login.php
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /wp-login.php
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
         volumeMounts:
           - mountPath: /usr/src/wordpress/wp-content/uploads
             name: nfs-mount
@@ -38,8 +58,10 @@ spec:
           - mountPath: /usr/src/wordpress/.htaccess
             name: nfs-mount
             subPath: {{ .Values.app.pvc.path }}/{{ .Values.app.name }}.htaccess
+      {{- if .Values.app.image.pullSecret }}
       imagePullSecrets:
-        - name: cr-auth
+        - name: {{ .Values.app.image.pullSecret }}
+      {{- end }}
       volumes:
       - name: nfs-mount
         persistentVolumeClaim:

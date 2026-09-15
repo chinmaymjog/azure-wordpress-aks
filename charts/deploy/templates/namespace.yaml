@@ -1,4 +1,4 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: $APP_LOCATION
+  name: {{ .Values.app.namespace }}

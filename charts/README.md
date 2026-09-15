@@ -1,19 +1,12 @@
-# 🎡 Azure WordPress Stack: Tier 4 - Application Boilerplate & Helm Chart
+# 🎡 Application Boilerplate & Helm Chart
 
-> **Part 4 of the Azure WordPress Stack ecosystem.**
+This directory provides a production-ready boilerplate and Helm chart for deploying WordPress at scale on Azure Kubernetes Service (AKS) - part of the [azure-wordpress-aks](../README.md) repo.
 
-This repository provides a production-ready boilerplate and Helm chart for deploying WordPress at scale on the Azure Kubernetes Service (AKS).
+## 🔗 Related Components
 
-## 🔗 Project Ecosystem Navigation
-
-You are currently at **Step 4: Application Boilerplate & Helm Chart**.
-
-* **Previous Step:** [Step 3: Static Assets (azure-wp-stack-static-assets)](https://github.com/chinmaymjog/azure-wp-stack-static-assets) - Dependency management for themes and plugins.
-* **Full Ecosystem:**
-  * 1️⃣ [Infrastructure](https://github.com/chinmaymjog/azure-wp-stack-infrastructure)
-  * 2️⃣ [Base Docker Image](https://github.com/chinmaymjog/azure-wp-stack-docker-base)
-  * 3️⃣ [Static Assets (Themes & Plugins)](https://github.com/chinmaymjog/azure-wp-stack-static-assets)
-  * 4️⃣ **Helm Chart Deployment** (You are here)
+* [Infrastructure (Terraform)](https://github.com/chinmaymjog/azure-wordpress-aks-infra) - the companion repo that provisions the AKS cluster, ACR, and database this deploys onto.
+* [../containers/docker-base](../containers/docker-base/README.md) - the base WordPress runtime image this chart's `Dockerfile` builds on.
+* [../containers/static-assets](../containers/static-assets/README.md) - the common plugins/themes pool this chart's `Dockerfile` pulls from.
 
 ---
 

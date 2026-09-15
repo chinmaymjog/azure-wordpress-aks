@@ -1,20 +1,12 @@
-# 📦 Azure WordPress Stack: Tier 2 - Docker Base Image
+# 📦 Docker Base Image
 
-> **Part 2 of the Azure WordPress Stack ecosystem.**
+A highly optimized and hardened base image for enterprise WordPress deployments - part of the [azure-wordpress-aks](../../README.md) repo.
 
-A highly optimized and hardened base image for enterprise WordPress deployments. Designed to be used in conjunction with a Kubernetes-based hosting platform.
+## 🔗 Related Components
 
-## 🔗 Project Ecosystem Navigation
-
-You are currently at **Step 2: Base Docker Image**.
-
-* **Previous Step:** [Step 1: Infrastructure (azure-wp-stack-infrastructure)](https://github.com/chinmaymjog/azure-wp-stack-infrastructure) - Provision the AKS environment.
-* **Next Step:** [Step 3: Static Assets (azure-wp-stack-static-assets)](https://github.com/chinmaymjog/azure-wp-stack-static-assets) - Manage custom plugins and themes.
-* **Full Ecosystem:**
-  * 1️⃣ [Infrastructure](https://github.com/chinmaymjog/azure-wp-stack-infrastructure)
-  * 2️⃣ **Base Docker Image** (You are here)
-  * 3️⃣ [Static Assets (Themes & Plugins)](https://github.com/chinmaymjog/azure-wp-stack-static-assets)
-  * 4️⃣ [Helm Chart Deployment & App Boilerplate](https://github.com/chinmaymjog/azure-wp-stack-helm-chart)
+* [Infrastructure (Terraform)](https://github.com/chinmaymjog/azure-wordpress-aks-infra) - provisions the AKS cluster/ACR this image gets pushed to and pulled onto.
+* [../static-assets](../static-assets/README.md) - the common plugins/themes pool.
+* [../../charts](../../charts/README.md) - the Helm chart and site-specific Dockerfile that build on this base image.
 
 ---
 
@@ -30,7 +22,7 @@ You are currently at **Step 2: Base Docker Image**.
 Use this image as the `FROM` instruction in your application Dockerfile:
 
 ```dockerfile
-FROM chinmaymjog/wp-base:latest
+FROM <your-acr-name>.azurecr.io/docker-base:latest
 COPY ./src /var/www/html
 ```
 

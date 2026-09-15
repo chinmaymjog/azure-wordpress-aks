@@ -8,6 +8,9 @@ plugin_list="common-plugins.list"
 # Function to download and extract plugins
 download_plugin() {
     while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="$(echo "$line" | xargs)"
+        [ -z "$line" ] && continue
         wget "$plugin_url/$line.zip" -O "$line.zip" || {
             echo "Failed to download plugin: $line"
             continue
@@ -24,6 +27,9 @@ download_plugin() {
 # Function to download and extract themes
 download_theme() {
     while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="$(echo "$line" | xargs)"
+        [ -z "$line" ] && continue
         wget "$theme_url/$line.zip" -O "$line.zip" || {
             echo "Failed to download theme: $line"
             continue

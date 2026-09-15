@@ -1,1 +1,9 @@
+# Plugin folder names to copy from the static-assets image's
+# /common-plugins into this site's wp-content/plugins (see Dockerfile).
+# Match by unzipped folder name only, not the versioned filename used in
+# containers/static-assets/pkg-mgr/common-plugins.list (e.g.
+# "all-in-one-wp-migration.7.81" there vs "all-in-one-wp-migration" here) -
+# WordPress plugin zips extract to a folder named after the slug, without
+# the version suffix, so this works today but is an implicit contract
+# between the two files.
 all-in-one-wp-migration
