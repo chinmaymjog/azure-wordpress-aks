@@ -22,6 +22,8 @@ scripts/
 .github/workflows/
   build.yml    # Builds & pushes all three images to ACR (az acr build, OIDC)
   deploy.yml   # helm upgrade --install onto AKS (az aks command invoke, OIDC)
+  verify.yml   # helm lint + helm template on every push/PR - no cloud
+                # credentials needed
 ```
 
 See each subdirectory's own README for details. The companion
