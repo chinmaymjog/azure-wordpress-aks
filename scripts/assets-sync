@@ -16,8 +16,9 @@ usage () {
     exit 1
 }
 
-# Use a secure temporary directory
-TMPDIR=$(mktemp -d) || die "Failed to create a temporary directory."
+# Use a secure temporary directory (not named TMPDIR, which tools like az honor)
+WORKDIR=$(mktemp -d) || die "Failed to create a temporary directory."
+trap 'rm -rf "$WORKDIR"' EXIT
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
@@ -40,7 +41,7 @@ if [[ -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_FILESHARE
     die "Missing required parameters."
 fi
 
-# Set destination storage credentials
+# Set source storage credentials
 export AZURE_STORAGE_ACCOUNT="$SRC_ST_ACCOUNT"
 export AZURE_STORAGE_KEY="$SRC_ST_KEY"
 
@@ -53,7 +54,7 @@ else
 fi  
 
 echo "===> Downloading files from source storage."
-if ! az storage file download-batch --destination "$TMPDIR" --source "$SRC_ST_FILESHARE/$SRC_DIR"; then
+if ! az storage file download-batch --destination "$WORKDIR" --source "$SRC_ST_FILESHARE/$SRC_DIR"; then
     die "Failed to download files from source fileshare."
 fi
 
@@ -69,12 +70,8 @@ else
 fi  
 
 echo "===> Uploading files to destination storage."
-if ! az storage file upload-batch --destination "$DST_ST_FILESHARE/$DST_DIR" --source "$TMPDIR"; then
+if ! az storage file upload-batch --destination "$DST_ST_FILESHARE/$DST_DIR" --source "$WORKDIR"; then
     die "Failed to upload files to destination fileshare."
 fi
-
-# Cleanup temporary files
-echo "===> Cleaning up temporary files."
-rm -rf "$TMPDIR"
 
 echo "===> File transfer completed successfully."

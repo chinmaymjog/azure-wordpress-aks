@@ -31,15 +31,23 @@ if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_N
     die "Missing parameters."
 fi
 
+# DB_NAME is interpolated into SQL; restrict it to safe identifier characters.
+if [[ ! "$DB_NAME" =~ ^[A-Za-z0-9_$-]+$ ]]; then
+    die "Invalid database name '$DB_NAME' (allowed: letters, digits, _, $, -)."
+fi
+
+# Pass the password via the environment so it is not visible in the process list.
+export MYSQL_PWD="$DB_PASS"
+
 echo "===> Connecting to $DB_HOST to check database existence."
 
-DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME';") || die "Failed to check database existence."
+DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" --skip-column-names -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$DB_NAME';") || die "Failed to check database existence."
 
 if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     echo "===> Database '$DB_NAME' already exists. Skipping creation."
 else
     echo "===> Database does not exists so creating database '$DB_NAME'."
-    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" -e "
+    mysql -h "$DB_HOST" -u"$DB_ADMIN" -e "
     CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
     FLUSH PRIVILEGES;
     " || die "Failed to create database '$DB_NAME'."
