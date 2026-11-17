@@ -1,0 +1,10 @@
+# Findings in the initial commit (92d1387) that are third-party keys vendored
+# with themes/plugins, not secrets owned by this repository. The files are no
+# longer in the current tree; they only exist in history.
+#
+# Kirki (typeflow theme) googlefonts Gruntfile: Google Fonts API key lines
+92d138727a7277d802f2eff05c81f8adac089cf6:themes/typeflow/functions/kirki/kirki-packages/googlefonts/Gruntfile.js:gcp-api-key:9
+92d138727a7277d802f2eff05c81f8adac089cf6:themes/typeflow/functions/kirki/kirki-packages/googlefonts/Gruntfile.js:gcp-api-key:13
+92d138727a7277d802f2eff05c81f8adac089cf6:themes/typeflow/functions/kirki/kirki-packages/googlefonts/Gruntfile.js:gcp-api-key:17
+# all-in-one-wp-migration plugin constants
+92d138727a7277d802f2eff05c81f8adac089cf6:plugins/all-in-one-wp-migration/constants.php:generic-api-key:293
