@@ -56,10 +56,22 @@ cd charts
 docker compose up --build
 ```
 
+Before the first run copy `.env.example` to `.env` (git-ignored) and set
+`MYSQL_ROOT_PASSWORD` (for example `openssl rand -hex 16`); compose refuses to
+start without it. The same applies to `containers/docker-base`.
+
 Brings up MySQL and the site image locally at `http://localhost`. This
-builds `charts/Dockerfile` directly, which by default pulls its base
-images from GHCR (`ghcr.io/chinmaymjog/azure-wordpress-aks/...`) - override
-with `--build-arg` if you're pointing at your own registry.
+builds `charts/Dockerfile`, which has no default base images: you must pass
+`STATIC_ASSETS_IMAGE` and `DOCKER_BASE_IMAGE` explicitly, pinned to a version
+tag or digest (not `:latest`). With compose, export them first:
+```bash
+export STATIC_ASSETS_IMAGE=<registry>/static-assets:<tag>
+export DOCKER_BASE_IMAGE=<registry>/docker-base:<tag>
+```
+With plain `docker build`, use `--build-arg STATIC_ASSETS_IMAGE=... --build-arg DOCKER_BASE_IMAGE=...`.
+
+`docker-base` pins wp-cli (`WP_CLI_VERSION`) and verifies its published
+sha512 (`WP_CLI_SHA512`); override both `--build-arg`s together to upgrade.
 
 ## 🔄 CI/CD Setup
 

@@ -1,10 +1,10 @@
 services:
   mysql:
-    image: mysql
+    image: mysql:8.4.13
     container_name: mysql
     user: mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=P@s$w0rD
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?copy .env.example to .env and set MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=wp-base
       - MYSQL_USER=wp-user
       - MYSQL_PASSWORD=SeCret
@@ -12,7 +12,11 @@ services:
       - ./tmp:/var/lib/mysql
 
   wordpress:
-    build: .
+    build:
+      context: .
+      args:
+        STATIC_ASSETS_IMAGE: ${STATIC_ASSETS_IMAGE:?set STATIC_ASSETS_IMAGE to a pinned static-assets image}
+        DOCKER_BASE_IMAGE: ${DOCKER_BASE_IMAGE:?set DOCKER_BASE_IMAGE to a pinned docker-base image}
     image: wordpress-boilerplate:v1.0.0
     container_name: wordpress
     ports:
