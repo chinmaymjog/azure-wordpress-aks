@@ -1,0 +1,11 @@
+# Accepted IaC findings. Each entry needs a justification.
+misconfigurations:
+  # Apache/PHP in the WordPress image write outside the mounted paths (runtime
+  # dirs under /var/run and /var/lock, upload handling). A read-only root
+  # filesystem would need the image reworked with explicit writable mounts.
+  # Compensating controls: allowPrivilegeEscalation is false and only the
+  # uploads path and .htaccess are mounted from storage.
+  - id: KSV-0014
+    paths:
+      - "templates/deployment.yaml"
+    statement: "WordPress/Apache requires a writable root filesystem"
