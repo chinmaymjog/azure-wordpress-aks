@@ -5,3 +5,6 @@
 
 # Local scratch
 **/tmp
+
+# Local environment files (copy from .env.example)
+.env
