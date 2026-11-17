@@ -117,6 +117,7 @@ helm upgrade --install wordpress ./charts/deploy \
 ```
 
 `database.db_user`/`db_pass` come from Key Vault (`mysql-<project>-main-user`/`-secret` secrets, see the infra repo).
+The chart stores `db_pass` in a Secret named `<app.name>-db` (key `db-password`) and the pod reads it via `secretKeyRef`, so it no longer appears in the pod spec. All `database.*` values are rendered as quoted strings, so special characters are safe; use `--set-string` for values that look like numbers/booleans.
 
 ### 4. Verify
 ```bash
