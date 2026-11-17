@@ -76,6 +76,8 @@ Both workflows authenticate via OIDC - no client secret stored in GitHub. One-ti
 4. **Build**: push to `main`/`develop` or tag `v*.*.*` triggers `build.yml`.
 5. **Deploy**: run `deploy.yml` manually from the Actions tab with the image tag `build.yml` produced. `main` deploys to `preprod`, a version tag deploys to `prod`, anything else deploys to `dev` - each behind its own GitHub Environment, so you can gate `prod` with required reviewers under Settings > Environments.
 
+The chart stores `db_pass` in a Secret named `<app.name>-db` (key `db-password`) and the pod reads it via `secretKeyRef`, so it no longer appears in the pod spec. All `database.*` values are rendered as quoted strings, so special characters are safe; use `--set-string` for values that look like numbers/booleans.
+
 ## 🛡️ License
 Distributed under the MIT License. See `LICENSE` in each subdirectory.
 
