@@ -26,7 +26,7 @@ scripts/
   fileshare-create, file-upload,        # Azure Files provisioning
   container-create, assets-sync         # Blob snapshot storage, env-to-env asset sync
 .github/workflows/
-  verify.yml   # helm lint + helm template on every push/PR - no cloud
+  helm-lint.yml   # helm lint + helm template on every push/PR - no cloud
                 # credentials needed
 ```
 
