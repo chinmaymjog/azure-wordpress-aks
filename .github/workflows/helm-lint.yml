@@ -1,0 +1,32 @@
+name: Helm lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Helm
+        uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
+
+      - name: helm lint
+        run: helm lint charts/deploy
+
+      - name: helm template (renders without error)
+        run: helm template test charts/deploy
