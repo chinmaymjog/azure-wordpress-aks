@@ -1,4 +1,6 @@
 FROM wordpress:php8.3-apache
+# Pull in available OS security fixes on top of the upstream image
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src/wordpress
 RUN docker-php-ext-install pdo pdo_mysql
 COPY src/custom.ini $PHP_INI_DIR/conf.d/
