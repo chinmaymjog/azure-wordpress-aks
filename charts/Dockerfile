@@ -1,5 +1,6 @@
-ARG STATIC_ASSETS_IMAGE=ghcr.io/chinmaymjog/azure-wordpress-aks/static-assets:latest
-ARG DOCKER_BASE_IMAGE=ghcr.io/chinmaymjog/azure-wordpress-aks/docker-base:latest
+# No defaults: pass both explicitly with --build-arg (use a pinned tag or digest, not :latest)
+ARG STATIC_ASSETS_IMAGE=required-pass-with-build-arg/static-assets:TAG
+ARG DOCKER_BASE_IMAGE=required-pass-with-build-arg/docker-base:TAG
 
 FROM ${STATIC_ASSETS_IMAGE} AS common
 
