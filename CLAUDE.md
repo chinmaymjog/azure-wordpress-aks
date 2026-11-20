@@ -9,7 +9,7 @@ Application layer for the azure-wordpress-aks-infra platform: layered container 
 - Don't bump image/base-image or chart dependency majors unless the issue asks for it; pin versions rather than using `latest`.
 
 ## Working on issues
-- Verify with `helm lint charts/deploy` and `helm template test charts/deploy` (same as CI in `.github/workflows/helm-lint.yml`); for shell changes run `bash -n <script>` and `shellcheck <script>`.
+- Verify with `helm lint charts/deploy` and `helm template test charts/deploy` (same as CI in `.github/workflows/verify.yml`); for shell changes run `bash -n <script>` and `shellcheck <script>`.
 - Add or update docs (`README.md`, `docs/`) when behavior or usage changes.
 - Keep changes minimal and scoped to the issue; one issue per PR.
-- Open a PR against `main` that references the issue (`Fixes #N`). Never push to `main` directly.
+- Open a PR against `advanced` that references the issue (`Fixes #N`). Never push to `advanced` directly.

@@ -12,7 +12,7 @@ on:
       - .trivyignore.yaml
       - .github/workflows/iac-scan.yml
   push:
-    branches: [main]
+    branches: [advanced]
   schedule:
     - cron: "47 4 * * 1"
   workflow_dispatch:
