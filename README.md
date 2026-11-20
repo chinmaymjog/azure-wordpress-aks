@@ -112,7 +112,7 @@ STORAGE_KEY=$(az storage account keys list --account-name "$STORAGE_ACCOUNT" --q
 
 ### 3. Deploy with Helm
 ```bash
-az aks get-credentials --resource-group rg-aks-<project>-main-weu --name aks-<project>-main-weu
+az aks get-credentials --resource-group rg-aks-<project>-main-eus2 --name aks-<project>-main-eus2
 
 helm upgrade --install wordpress ./charts/deploy \
   --namespace wordpress --create-namespace \
