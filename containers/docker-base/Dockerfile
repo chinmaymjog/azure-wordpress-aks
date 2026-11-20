@@ -1,4 +1,4 @@
-FROM wordpress:7.1.4-php8.3-apache
+FROM wordpress:7.1.5-php8.3-apache
 # Pull in available OS security fixes on top of the upstream image
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src/wordpress
