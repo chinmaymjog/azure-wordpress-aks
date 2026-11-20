@@ -33,9 +33,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" ||  -z "${SRC_ST_ACCOUNT}"  || -z "${SRC_ST_KEY}" || -z "${SRC_ST_CONTAINER}" || -z "${DIR:-}" ]]; then  
+if [[ -z "${DB_HOST:-}" || -z "${DB_ADMIN:-}" || -z "${DB_PASS:-}" || -z "${DB_NAME:-}" ||  -z "${SRC_ST_ACCOUNT:-}" || -z "${SRC_ST_KEY:-}" || -z "${SRC_ST_CONTAINER:-}" || -z "${DIR:-}" ]]; then  
     die "Missing required parameters."
 fi
+
+# DB_NAME is interpolated into SQL; restrict it to safe identifier characters.
+if [[ ! "$DB_NAME" =~ ^[A-Za-z0-9_$-]+$ ]]; then
+    die "Invalid database name '$DB_NAME' (allowed: letters, digits, _, $, -)."
+fi
+
+# Pass the password via the environment so it is not visible in the process list.
+export MYSQL_PWD="$DB_PASS"
+
+# Keep downloaded/extracted files in a private directory that is always removed.
+WORKDIR=$(mktemp -d) || die "Failed to create a temporary directory."
+trap 'rm -rf "$WORKDIR"' EXIT
 
 # Set Azure storage environment variables
 export AZURE_STORAGE_ACCOUNT="$SRC_ST_ACCOUNT"
@@ -50,34 +62,37 @@ else
 fi  
 
 echo "===> Checking if database '$DB_NAME' exists on host '$DB_HOST'..."
-DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" --skip-column-names -e "SHOW DATABASES LIKE '$DB_NAME'") || die "Failed to connect to MySQL."
+DB_EXISTS=$(mysql -h "$DB_HOST" -u"$DB_ADMIN" --skip-column-names -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$DB_NAME';") || die "Failed to connect to MySQL."
 
 if [[ "$DB_EXISTS" == "$DB_NAME" ]]; then
     echo "===> Database '$DB_NAME' exists. Proceeding with restore..."
     
     # Download checkin.txt
     echo "===> Downloading 'checkin.txt' from Azure Storage..."
-    az storage blob download --container-name "$SRC_ST_CONTAINER" --name "$DIR/checkin.txt" --file "checkin.txt" --overwrite || die "Failed to download checkin.txt."
+    az storage blob download --container-name "$SRC_ST_CONTAINER" --name "$DIR/checkin.txt" --file "$WORKDIR/checkin.txt" --overwrite || die "Failed to download checkin.txt."
 
     # Read the database dump name
-    if [[ ! -f checkin.txt ]]; then
+    if [[ ! -f "$WORKDIR/checkin.txt" ]]; then
         die "checkin.txt file not found after download!"
     fi
-    BACKUP_FILE=$(cat checkin.txt)
+    BACKUP_FILE=$(cat "$WORKDIR/checkin.txt")
+    if [[ ! "$BACKUP_FILE" =~ ^[A-Za-z0-9_.$-]+$ ]]; then
+        die "checkin.txt contains an invalid backup file name."
+    fi
 
     echo "===> Downloading database dump '$BACKUP_FILE.tar.gz'..."
-    az storage blob download --container-name "$SRC_ST_CONTAINER" --name "$DIR/$BACKUP_FILE.tar.gz" --file "$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
+    az storage blob download --container-name "$SRC_ST_CONTAINER" --name "$DIR/$BACKUP_FILE.tar.gz" --file "$WORKDIR/$BACKUP_FILE.tar.gz" || die "Failed to download database dump."
 
     echo "===> Extracting database dump..."
-    tar -xzvf "$BACKUP_FILE.tar.gz" || die "Failed to extract database dump."
+    tar -xzf "$WORKDIR/$BACKUP_FILE.tar.gz" -C "$WORKDIR" || die "Failed to extract database dump."
 
     # Ensure extracted SQL file exists
-    if [[ ! -f "$BACKUP_FILE" ]]; then
+    if [[ ! -f "$WORKDIR/$BACKUP_FILE" ]]; then
         die "Extracted SQL file '$BACKUP_FILE' not found!"
     fi
 
     echo "===> Restoring database from '$BACKUP_FILE'..."
-    mysql -h "$DB_HOST" -u"$DB_ADMIN" -p"$DB_PASS" "$DB_NAME" < "$BACKUP_FILE" || die "Database restore failed."
+    mysql -h "$DB_HOST" -u"$DB_ADMIN" "$DB_NAME" < "$WORKDIR/$BACKUP_FILE" || die "Database restore failed."
 
     echo "===> Database '$DB_NAME' restore completed successfully."
 else

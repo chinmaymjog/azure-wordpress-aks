@@ -22,6 +22,8 @@ scripts/
 .github/workflows/
   build.yml    # Builds & pushes all three images to ACR (az acr build, OIDC)
   deploy.yml   # helm upgrade --install onto AKS (az aks command invoke, OIDC)
+  verify.yml   # helm lint + helm template on every push/PR - no cloud
+                # credentials needed
 ```
 
 See each subdirectory's own README for details. The companion
@@ -54,10 +56,22 @@ cd charts
 docker compose up --build
 ```
 
+Before the first run copy `.env.example` to `.env` (git-ignored) and set
+`MYSQL_ROOT_PASSWORD` (for example `openssl rand -hex 16`); compose refuses to
+start without it. The same applies to `containers/docker-base`.
+
 Brings up MySQL and the site image locally at `http://localhost`. This
-builds `charts/Dockerfile` directly, which by default pulls its base
-images from GHCR (`ghcr.io/chinmaymjog/azure-wordpress-aks/...`) - override
-with `--build-arg` if you're pointing at your own registry.
+builds `charts/Dockerfile`, which has no default base images: you must pass
+`STATIC_ASSETS_IMAGE` and `DOCKER_BASE_IMAGE` explicitly, pinned to a version
+tag or digest (not `:latest`). With compose, export them first:
+```bash
+export STATIC_ASSETS_IMAGE=<registry>/static-assets:<tag>
+export DOCKER_BASE_IMAGE=<registry>/docker-base:<tag>
+```
+With plain `docker build`, use `--build-arg STATIC_ASSETS_IMAGE=... --build-arg DOCKER_BASE_IMAGE=...`.
+
+`docker-base` pins wp-cli (`WP_CLI_VERSION`) and verifies its published
+sha512 (`WP_CLI_SHA512`); override both `--build-arg`s together to upgrade.
 
 ## 🔄 CI/CD Setup
 
@@ -73,6 +87,8 @@ Both workflows authenticate via OIDC - no client secret stored in GitHub. One-ti
    - `PVC_FILESHARE`, `SITE_DOMAIN` - your own values.
 4. **Build**: push to `main`/`develop` or tag `v*.*.*` triggers `build.yml`.
 5. **Deploy**: run `deploy.yml` manually from the Actions tab with the image tag `build.yml` produced. `main` deploys to `preprod`, a version tag deploys to `prod`, anything else deploys to `dev` - each behind its own GitHub Environment, so you can gate `prod` with required reviewers under Settings > Environments.
+
+The chart stores `db_pass` in a Secret named `<app.name>-db` (key `db-password`) and the pod reads it via `secretKeyRef`, so it no longer appears in the pod spec. All `database.*` values are rendered as quoted strings, so special characters are safe; use `--set-string` for values that look like numbers/booleans.
 
 ## 🛡️ License
 Distributed under the MIT License. See `LICENSE` in each subdirectory.
