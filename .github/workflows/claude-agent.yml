@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5
-      - uses: anthropics/claude-code-action@c84e279f859e2591391e95bd309286eb111c345f # v1
+      - uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
